@@ -216,8 +216,8 @@ Add screenshot here
 
 ### Analytics Dashboard
 
-![images](analytics1.png)
-![images](analytics2.png)
+![Dashboard](iamges/analytics1.png)
+![Dashboard](iamges/analytics2.png)
 
 ---
 
