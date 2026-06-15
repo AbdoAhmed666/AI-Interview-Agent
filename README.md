@@ -204,8 +204,8 @@ http://localhost:8501
 
 ### Interview Session
 
-![images](image.png)
-![images](image2.png)
+![Interview Flow](iamges/image.png)
+![Interview Flow](iamges/image2.png)
 ---
 
 ### Answer Evaluation
