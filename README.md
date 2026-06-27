@@ -1,252 +1,409 @@
-# 🤖 AI Interview Agent
+# AI Interview Agent
 
-An AI-powered interview preparation platform that simulates technical and behavioral interviews, evaluates answers using Large Language Models (LLMs), generates detailed feedback, and provides analytics dashboards for performance tracking.
+Production-grade AI interview simulation platform that dynamically evaluates technical answers using LLMs, adapts interview difficulty in real time, generates hiring recommendations, and produces detailed interview analytics.
 
 ---
 
-## 🚀 Features
+## Overview
 
-### 🎯 AI Interview Simulation
+AI Interview Agent is a full-stack AI system designed to simulate real technical interviews for software engineers, data scientists, and technical professionals.
 
-Generate role-specific interview questions for positions such as:
+Instead of simply generating interview questions, the system behaves like an adaptive interviewer that:
+
+* Generates role-specific technical questions
+* Evaluates candidate answers using Large Language Models
+* Measures candidate performance
+* Dynamically adjusts question difficulty
+* Detects strengths and knowledge gaps
+* Generates hiring recommendations
+* Produces downloadable PDF interview reports
+* Displays interview analytics dashboard
+
+The goal of this project is to build a production-grade AI interviewing platform that mimics real-world technical screening processes.
+
+---
+
+## Core Features
+
+### AI Question Generation
+
+Generate interview questions tailored to a specific role.
+
+Examples:
 
 * Data Scientist
-* Data Analyst
+* Backend Engineer
 * Machine Learning Engineer
-* Software Engineer
-* Product Analyst
-* Any custom role
+* Frontend Developer
 
 ---
 
-### 📝 Intelligent Answer Evaluation
+### Adaptive Interview Engine
 
-For every answer submitted, the system provides:
+The system dynamically changes question difficulty based on candidate performance.
 
-* Interview score
-* Strengths
-* Weaknesses
-* Improvement suggestions
-* Detailed feedback
+Difficulty Logic:
 
----
+* Strong Answer → Increase difficulty
+* Weak Answer → Decrease difficulty
+* Medium Answer → Keep same difficulty
 
-### 📊 Interview Analytics Dashboard
+Difficulty Range:
 
-Track interview performance over time:
-
-* Total interviews completed
-* Average score
-* Highest score
-* Lowest score
-* Historical score trends
-* Role-based performance analysis
+* Minimum = 1
+* Maximum = 5
 
 ---
 
-### 🔄 Multi-Question Interview Sessions
+### AI Evaluation Engine
 
-The platform supports complete interview sessions:
+Each answer is evaluated using LLM reasoning.
 
-1. Generate interview questions
-2. Answer each question
-3. Receive evaluation
-4. Generate final summary
-5. Store results for analytics
+Evaluation returns structured JSON:
+
+```json
+{
+  "score": 82,
+  "level": "strong",
+  "strengths": ["Good understanding of model evaluation"],
+  "weaknesses": ["Lacked explanation of overfitting"],
+  "feedback": "Solid answer overall",
+  "concept_gaps": ["Cross validation"],
+  "follow_up_question": "Explain regularization."
+}
+```
 
 ---
 
-### 📈 Session Summary
+### Multi Provider LLM Routing
 
-At the end of every interview session:
+The system supports multiple AI providers.
+
+Current providers:
+
+* Google Gemini
+* Groq LLM API
+* Mock Provider (fallback)
+
+Routing Logic:
+
+```text
+Try Gemini
+      ↓
+If quota/rate limit reached
+      ↓
+Try Groq
+      ↓
+If failure occurs
+      ↓
+Fallback to Mock Provider
+```
+
+This architecture reduces downtime caused by API quota limitations.
+
+---
+
+### Session Summary Generation
+
+At the end of the interview, the system generates:
 
 * Overall score
-* Overall strengths
-* Overall weaknesses
+* Performance summary
 * Hiring recommendation
 
----
+Possible hiring recommendations:
 
-## 🏗️ System Architecture
-
-```text
-Frontend (Streamlit)
-        │
-        ▼
-FastAPI Backend
-        │
-        ▼
-LLM Provider
-        │
-        ▼
-Evaluation Engine
-        │
-        ▼
-History Storage & Analytics
-```
+* Strong Hire
+* Hire
+* Weak Hire
+* Reject
 
 ---
 
-## 📂 Project Structure
+### PDF Report Generator
 
-```text
-AI-INTERVIEW-AGENT/
-│
-├── backend/
-│   ├── analytics.py
-│   ├── config.py
-│   ├── evaluator.py
-│   ├── history.py
-│   ├── interview.py
-│   ├── llm_provider.py
-│   ├── main.py
-│   ├── prompts.py
-│   └── schemas.py
-│
-├── frontend/
-│   └── app.py
-│
-├── data/
-│
-├── requirements.txt
-├── .env.example
-└── README.md
-```
+Generate a professional PDF report containing:
 
----
+* Candidate role
+* Final score
+* Question-by-question evaluation
+* Strengths
+* Weaknesses
+* Knowledge gaps
+* Hiring recommendation
 
-## 🛠️ Technologies Used
-
-### Backend
-
-* FastAPI
-* Pydantic
-* Python
-
-### Frontend
-
-* Streamlit
-
-### AI
-
-* Large Language Models (LLMs)
-* Prompt Engineering
-
-### Data Processing
-
-* Pandas
-
-### Storage
-
-* CSV-based history tracking
-
----
-
-## ⚙️ Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/YOUR_USERNAME/AI-Interview-Agent.git
-
-cd AI-Interview-Agent
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Configure environment variables:
-
-```bash
-cp .env.example .env
-```
-
-Add your API key inside:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-```
-
----
-
-## ▶️ Running the Backend
-
-```bash
-python -m uvicorn backend.main:app --reload --port 8001
-```
-
-Backend:
-
-```text
-http://127.0.0.1:8001
-```
-
----
-
-## ▶️ Running the Frontend
-
-```bash
-streamlit run frontend/app.py
-```
-
-Frontend:
-
-```text
-http://localhost:8501
-```
-
----
-
-## 📸 Screenshots
-
-### Interview Session
-
-![Interview Flow](iamges/image.png)
-![Interview Flow](iamges/image2.png)
----
-
-### Answer Evaluation
-
-Add screenshot here
+Implemented using ReportLab.
 
 ---
 
 ### Analytics Dashboard
 
-![Dashboard](iamges/analytics1.png)
-![Dashboard](iamges/analytics2.png)
+Interactive dashboard displaying:
+
+* Average Score
+* Best Score
+* Questions Answered
+* Score Distribution
+* Performance Trend
+* Strength Areas
+* Weak Areas
 
 ---
 
-## 📌 Future Improvements
+## Tech Stack
 
-* PDF report generation
-* Skill breakdown analytics
-* SQLite database integration
-* User authentication
-* Interview difficulty levels
-* Deployment to cloud platforms
-* Advanced visual analytics
+### Frontend
+
+* Next.js
+* TypeScript
+* TailwindCSS
+
+### Backend
+
+* FastAPI
+* Python
+* Pydantic
+
+### AI Layer
+
+* Gemini API
+* Groq API
+
+### Reporting
+
+* ReportLab PDF Generator
 
 ---
 
-## 🎯 Project Goals
+## Project Architecture
 
-This project was built to:
+```text
+                USER
+                  │
+                  ▼
 
-* Practice AI application development
-* Build production-like FastAPI services
-* Create interactive Streamlit interfaces
-* Explore LLM-based evaluation systems
-* Track interview performance through analytics
+          Next.js Frontend
+                  │
+                  ▼
+
+            FastAPI Backend
+                  │
+       ┌──────────┴──────────┐
+       │                     │
+       ▼                     ▼
+
+ Adaptive Engine        Session Manager
+       │                     │
+       └──────────┬──────────┘
+                  │
+                  ▼
+
+          LLM Router Provider
+                  │
+       ┌──────────┴──────────┐
+       │                     │
+       ▼                     ▼
+
+ Gemini Provider       Groq Provider
+       │                     │
+       └────Fallback Logic───┘
+                  │
+                  ▼
+
+        Evaluation Engine
+                  │
+                  ▼
+
+        PDF Report Generator
+```
 
 ---
 
-## 👨‍💻 Author
+## API Endpoints
 
-Abdelrhman Ahmed
+### Start Interview
 
-GitHub: https://github.com/AbdoAhmed666
+```http
+POST /start-interview
+```
+
+Generate first interview question.
+
+---
+
+### Adaptive Interview
+
+```http
+POST /adaptive-interview
+```
+
+Evaluate answer and generate next adaptive question.
+
+---
+
+### Session Summary
+
+```http
+POST /summarize-session
+```
+
+Generate final interview summary.
+
+---
+
+### Download Report
+
+```http
+POST /download-report
+```
+
+Generate downloadable PDF report.
+
+---
+
+## Project Structure
+
+```text
+AI-Interview-Agent/
+
+backend/
+│
+├── adaptive_engine.py
+├── evaluator.py
+├── history.py
+├── interview.py
+├── llm_provider.py
+├── prompts.py
+├── schemas.py
+├── config.py
+└── main.py
+
+
+frontend/
+│
+├── app/
+│   └── page.tsx
+│
+├── components/
+│   ├── InterviewCard.tsx
+│   ├── AnswerBox.tsx
+│   ├── EvaluationCard.tsx
+│   ├── ProgressBar.tsx
+│   ├── HistoryPanel.tsx
+│   └── Dashboard.tsx
+```
+
+---
+
+## Screenshots
+
+### Home Screen
+
+(Add screenshot)
+
+### Interview Session
+
+(Add screenshot)
+
+### Evaluation Screen
+
+(Add screenshot)
+
+### Analytics Dashboard
+
+(Add screenshot)
+
+---
+
+## Environment Variables
+
+Create .env file
+
+```env
+GEMINI_API_KEY=
+
+MODEL_NAME=gemini-2.0-flash
+
+GROQ_API_KEY=
+
+GROQ_MODEL=llama-3.3-70b-versatile
+
+LLM_PROVIDER=router
+```
+
+---
+
+## Development Roadmap
+
+### Completed
+
+* AI Question Generation
+* Adaptive Interview Logic
+* AI Answer Evaluation
+* Gemini Provider Integration
+* Groq Provider Integration
+* Multi Provider Router
+* Session Summarization
+* PDF Report Generation
+* Analytics Dashboard
+
+---
+
+### Phase 2
+
+* Authentication
+* Database Integration
+* Save Interview History
+
+---
+
+### Phase 3
+
+* Voice Interview Mode
+* Speech To Text
+
+---
+
+### Phase 4
+
+* Webcam Analysis
+* Facial Emotion Detection
+
+---
+
+### Phase 5
+
+* Cloud Deployment
+
+---
+
+## Why This Project Matters
+
+Most interview bots simply ask random questions.
+
+AI Interview Agent simulates a real technical interviewer by:
+
+* Understanding answer quality
+* Measuring candidate level
+* Adapting difficulty in real time
+* Generating recruiter-like hiring decisions
+
+This project focuses on real AI system design rather than simple chatbot behavior.
+
+---
+
+## Future Vision
+
+The long-term goal is building a fully autonomous AI recruiter capable of:
+
+* Conducting interviews
+* Understanding voice responses
+* Reading facial expressions
+* Detecting confidence and hesitation
+* Producing complete hiring decisions
+
+---
+
+## License
+
+MIT License
