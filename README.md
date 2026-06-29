@@ -299,7 +299,7 @@ frontend/
 
 ### Home Screen
 
-![Home Page](./images/first.png)
+![Home Page](./iamges/first.png)
 <img src="./images/second.png" width="900"/>
 
 ### Interview Session
