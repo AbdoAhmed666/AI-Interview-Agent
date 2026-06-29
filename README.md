@@ -299,7 +299,7 @@ frontend/
 
 ### Home Screen
 
-(Add screenshot)
+![Home Page](./images/first.png)
 
 ### Interview Session
 
