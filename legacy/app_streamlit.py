@@ -25,6 +25,48 @@ REPORT_URL = f"{API_BASE_URL}/download-report"
 
 st.set_page_config(page_title="AI Interview Agent", page_icon="🤖")
 
+st.markdown("""
+<style>
+/* Background */
+.main {
+    background-color: #0f172a;
+    color: white;
+}
+
+/* Cards */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Buttons */
+.stButton>button {
+    background: linear-gradient(90deg, #4f46e5, #06b6d4);
+    color: white;
+    border-radius: 10px;
+    padding: 0.5rem 1rem;
+    border: none;
+    transition: 0.3s;
+}
+
+.stButton>button:hover {
+    transform: scale(1.02);
+}
+
+/* Inputs */
+textarea, input {
+    border-radius: 10px !important;
+}
+
+/* Metrics cards feel */
+[data-testid="metric-container"] {
+    background-color: #1e293b;
+    padding: 1rem;
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 page = st.sidebar.radio("Navigation", ["Interview", "Analytics"])
 
 if page == "Analytics":
@@ -63,6 +105,19 @@ if page == "Analytics":
 
 st.title("AI Interview Agent")
 st.write("Generate a question, answer it, and get a structured evaluation.")
+
+st.sidebar.markdown("## 🤖 AI Interview Agent")
+st.sidebar.markdown("Smart adaptive interview system")
+
+st.sidebar.divider()
+
+st.sidebar.markdown("### Progress")
+if st.session_state.questions:
+    st.sidebar.progress(progress)
+
+st.sidebar.markdown("### Session")
+st.sidebar.write(f"Role: {st.session_state.role}")
+st.sidebar.write(f"Questions: {len(st.session_state.questions)}")
 
 if "question" not in st.session_state:
     st.session_state.question = ""
@@ -116,13 +171,60 @@ if st.session_state.session_started and st.session_state.questions:
     index = st.session_state.current_question_index
     progress = (index + 1) / total_questions
 
-    st.subheader(f"Question {index + 1} of {total_questions}")
+    st.markdown(f"""
+    <div style="
+        background:#1e293b;
+        padding:20px;
+        border-radius:15px;
+        margin-bottom:15px;
+    ">
+    <h3>Question {index + 1} / {total_questions}</h3>
+    <p style="color:#94a3b8;">Progress: {int(progress*100)}%</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.progress(progress)
+
+    st.markdown(f"""
+    <div style="
+        background:#0b1220;
+        padding:20px;
+        border-radius:15px;
+        border:1px solid #334155;
+    ">
+    <h4>🧠 Question</h4>
+    <p>{st.session_state.questions[index]}</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.write(f"Progress: {int(progress * 100)}%")
     st.write(st.session_state.questions[index])
 
-    answer = st.text_area("Your answer", value=st.session_state.answers[index], height=150, placeholder="Type your response here...")
-    st.session_state.answers[index] = answer
+    answer = st.text_area(
+        "Your Answer",
+        value=st.session_state.answers[index],
+        height=150
+    )
+
+    st.session_state.answers[index] = answer    
+
+    st.markdown("### 📊 Evaluation Result")
+
+    st.metric("Score", f"{evaluation.get('score', 0)}/10")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### 💪 Strengths")
+        for s in evaluation.get("strengths", []):
+            st.markdown(f"- {s}")
+
+    with col2:
+        st.markdown("#### ⚠️ Weaknesses")
+        for w in evaluation.get("weaknesses", []):
+            st.markdown(f"- {w}")
+
+    st.markdown("#### 💬 Feedback")
+    st.info(evaluation.get("feedback", "No feedback"))
 
     if st.button("Evaluate Answer"):
         if not answer.strip():
@@ -173,17 +275,23 @@ if st.session_state.session_started and st.session_state.questions:
 
                     if summary_response.ok:
                         st.session_state.final_summary = summary_response.json()
-                        st.success("Final summary generated.")
-                        st.subheader("Final Summary")
-                        st.metric("Overall Score", f"{st.session_state.final_summary.get('overall_score', 0)}/10")
-                        st.subheader("Overall Strengths")
-                        for item in st.session_state.final_summary.get("overall_strengths", []):
-                            st.write("- " + item)
-                        st.subheader("Overall Weaknesses")
-                        for item in st.session_state.final_summary.get("overall_weaknesses", []):
-                            st.write("- " + item)
-                        st.subheader("Hiring Recommendation")
-                        st.write(st.session_state.final_summary.get("hiring_recommendation", "No recommendation returned."))
+                        st.markdown("## 🏁 Final Interview Report")
+
+                        col1, col2, col3 = st.columns(3)
+
+                        col1.metric("Overall Score", f"{st.session_state.final_summary.get('overall_score', 0)}/10")
+                        col2.metric("Level", "AI Evaluated")
+                        col3.metric("Status", "Completed")
+
+                        st.markdown("### 💪 Overall Strengths")
+                        st.success("\n".join(st.session_state.final_summary.get("overall_strengths", [])))
+
+                        st.markdown("### ⚠️ Overall Weaknesses")
+                        st.warning("\n".join(st.session_state.final_summary.get("overall_weaknesses", [])))
+
+                        st.markdown("### 🎯 Recommendation")
+                        st.info(st.session_state.final_summary.get("hiring_recommendation"))
+                   
                     else:
                         st.error("Failed to generate the final summary.")
                         st.write(summary_response.text)
@@ -191,7 +299,48 @@ if st.session_state.session_started and st.session_state.questions:
                 st.error("Evaluation failed.")
                 st.write(response.text)
 
-if st.session_state.final_summary:
-    st.divider()
-    st.subheader("Session Summary")
-    st.write("All five questions and evaluations were used to generate this result.")
+    if st.session_state.final_summary:
+        st.divider()
+        st.subheader("Session Summary")
+        st.write("All five questions and evaluations were used to generate this result.")
+
+    if st.button("Generate PDF Report"):
+
+        report_response = requests.post(
+            REPORT_URL,
+            json={
+                "role": st.session_state.role,
+
+                "overall_score":
+                    st.session_state.final_summary["overall_score"],
+
+                "overall_strengths":
+                    st.session_state.final_summary["overall_strengths"],
+
+                "overall_weaknesses":
+                    st.session_state.final_summary["overall_weaknesses"],
+
+                "hiring_recommendation":
+                    st.session_state.final_summary["hiring_recommendation"],
+
+                "questions":
+                    st.session_state.questions,
+
+                "answers":
+                    st.session_state.answers,
+
+                "evaluations":
+                    st.session_state.evaluations,
+            },
+            timeout=60,
+        )
+
+        if report_response.ok:
+            st.download_button(
+                label="📄 Download Interview Report",
+                data=report_response.content,
+                file_name="interview_report.pdf",
+                mime="application/pdf",
+            )
+        else:
+            st.error("Failed to generate PDF report.")

@@ -10,7 +10,13 @@ from .prompts import build_interview_question_prompt
 provider: BaseLLMProvider = get_provider()
 
 
-def generate_question(role: str) -> str:
+def generate_question(
+        role: str,
+        difficulty: int = 3
+) -> str:
     """Return a mocked interview question for the selected role."""
-    prompt = build_interview_question_prompt(role)
+    prompt = build_interview_question_prompt(
+            role=role,
+            difficulty=difficulty
+)
     return provider.generate_question(prompt)

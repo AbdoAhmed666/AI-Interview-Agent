@@ -20,34 +20,73 @@ class InterviewResponse(BaseModel):
 
 
 class EvaluationRequest(BaseModel):
-    """Request payload for evaluating an interview answer."""
 
     role: str
+
     question: str
+
     answer: str
+
+    current_difficulty: int = Field(ge=1, le=5)
 
 
 class EvaluationResponse(BaseModel):
-    """Response payload with structured evaluation results."""
 
     score: int = Field(ge=0, le=10)
+
+    level: str
+
     strengths: list[str]
+
     weaknesses: list[str]
+
     feedback: str
+
+    concept_gaps: list[str]
+
     follow_up_question: str
 
+
+class QuestionEvaluation(BaseModel):
+
+    score: int = Field(ge=0, le=10)
+
+    level: str
+
+    strengths: list[str]
+
+    weaknesses: list[str]
+
+    feedback: str
+
+    concept_gaps: list[str]
+
+    follow_up_question: str
+
+class AdaptiveEvaluationResponse(BaseModel):
+
+    evaluation: EvaluationResponse
+
+    next_question: str
+
+    difficulty: int
+
+    decision: str
 
 class ReportRequest(BaseModel):
-    """Request payload for generating a PDF interview report."""
-
     role: str
-    question: str
-    answer: str
-    score: int = Field(ge=0, le=10)
-    strengths: list[str]
-    weaknesses: list[str]
-    feedback: str
-    follow_up_question: str
+
+    overall_score: int = Field(ge=0, le=10)
+
+    overall_strengths: list[str]
+    overall_weaknesses: list[str]
+
+    hiring_recommendation: str
+
+    questions: list[str]
+    answers: list[str]
+
+    evaluations: list[QuestionEvaluation]
 
 
 class SessionSummaryRequest(BaseModel):
@@ -56,7 +95,7 @@ class SessionSummaryRequest(BaseModel):
     role: str
     questions: list[str]
     answers: list[str]
-    evaluations: list[dict]
+    evaluations: list[QuestionEvaluation]
 
 
 class SessionSummaryResponse(BaseModel):

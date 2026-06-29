@@ -8,15 +8,43 @@ import sys
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+from .adaptive_engine import AdaptiveEngine
 
 from .config import settings
-from .evaluator import build_report_pdf, evaluate_answer, summarize_session
+
+from .evaluator import (
+    build_report_pdf,
+    evaluate_answer,
+    summarize_session,
+)
+
 from .interview import generate_question
+
 from .llm_provider import GeminiProvider, get_provider
-from .schemas import EvaluationRequest, EvaluationResponse, InterviewRequest, InterviewResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
+
+from .schemas import (
+    AdaptiveEvaluationResponse,
+    EvaluationRequest,
+    EvaluationResponse,
+    InterviewRequest,
+    InterviewResponse,
+    ReportRequest,
+    SessionSummaryRequest,
+    SessionSummaryResponse,
+)
+
 
 app = FastAPI(title="AI Interview Agent API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root() -> dict[str, str]:
@@ -29,7 +57,10 @@ def start_interview(request: InterviewRequest) -> InterviewResponse:
     """Return a mock interview question for the selected role."""
     return InterviewResponse(
         role=request.role,
-        question=generate_question(request.role),
+        question=generate_question(
+        request.role,
+        difficulty=3
+        ),
     )
 
 
@@ -37,10 +68,60 @@ def start_interview(request: InterviewRequest) -> InterviewResponse:
 def evaluate_answer_endpoint(request: EvaluationRequest) -> EvaluationResponse:
     """Evaluate a candidate answer and validate the returned JSON structure."""
     try:
-        return evaluate_answer(request.role, request.question, request.answer)
+        return evaluate_answer(
+            request.role,
+            request.question,
+            request.answer,
+            request.current_difficulty
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+@app.post(
+    "/adaptive-interview",
+    response_model=AdaptiveEvaluationResponse
+)
+def adaptive_interview(
+    request: EvaluationRequest
+) -> AdaptiveEvaluationResponse:
+
+    try:
+
+        # Step 1 → evaluate answer
+        evaluation = evaluate_answer(
+            request.role,
+            request.question,
+            request.answer,
+            request.current_difficulty
+        )
+
+        # Step 2 → calculate next difficulty
+        next_difficulty, decision = (
+            AdaptiveEngine.get_next_difficulty(
+                evaluation.level,
+                request.current_difficulty
+            )
+        )
+
+        # Step 3 → generate next question
+        next_question = generate_question(
+            role=request.role,
+            difficulty=next_difficulty
+        )
+
+        # Step 4 → return adaptive response
+        return AdaptiveEvaluationResponse(
+            evaluation=evaluation,
+            next_question=next_question,
+            difficulty=next_difficulty,
+            decision=decision
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        ) from exc
 
 @app.post("/summarize-session", response_model=SessionSummaryResponse)
 def summarize_session_endpoint(request: SessionSummaryRequest) -> SessionSummaryResponse:

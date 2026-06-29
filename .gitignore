@@ -1,3 +1,35 @@
-node_modules/
-dist/
+# Python
+
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+
 .env
+venv/
+.venv/
+
+# Data
+
+*.csv
+
+# Node
+
+node_modules/
+
+# Next.js
+
+.next/
+out/
+
+# OS
+
+.DS_Store
+Thumbs.db
+dist/
+# IDE
+
+.vscode/
+.idea/

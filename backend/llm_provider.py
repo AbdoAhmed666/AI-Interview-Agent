@@ -66,16 +66,28 @@ class GeminiProvider(BaseLLMProvider):
         logger.info("Gemini model name: %s", settings.model_name)
 
     def generate_question(self, prompt: str) -> str:
-        """Generate a question using Gemini or fall back safely on failure."""
         return self._generate_text(prompt)
+        # try:
+        #     return self._generate_text(prompt)
+        # except Exception:
+        #     logger.warning("Using fallback interview question")
+        #     return FALLBACK_QUESTION
 
     def evaluate_answer(self, prompt: str) -> str:
-        """Evaluate an answer using Gemini or fall back safely on failure."""
         return self._generate_text(prompt)
+        # try:
+        #     return self._generate_text(prompt)
+        # except Exception:
+        #     logger.warning("Using mock evaluation fallback")
+        #     return MockLLMProvider().evaluate_answer(prompt)
 
     def summarize_session(self, prompt: str) -> str:
-        """Generate a session summary using Gemini or fall back safely on failure."""
         return self._generate_text(prompt)
+        # try:
+        #     return self._generate_text(prompt)
+        # except Exception:
+        #     logger.warning("Using mock summary fallback")
+        #     return MockLLMProvider().summarize_session(prompt)
 
     def _generate_text(self, prompt: str) -> str:
         """Internal Gemini text-generation path kept unchanged."""
@@ -107,22 +119,168 @@ class GeminiProvider(BaseLLMProvider):
             logger.warning("Gemini returned an empty response; using fallback question")
             return FALLBACK_QUESTION
         except TimeoutError as exc:
-            logger.exception("Gemini request timed out; using fallback question")
-            logger.error("Gemini timeout exception type: %s", type(exc).__name__)
-            logger.error("Gemini timeout exception message: %s", str(exc))
-            return FALLBACK_QUESTION
+            logger.exception("Gemini request timed out")
+            raise exc
+
         except Exception as exc:
-            logger.exception("Gemini request failed; using fallback question")
-            logger.error("Gemini exception type: %s", type(exc).__name__)
-            logger.error("Gemini exception message: %s", str(exc))
-            return FALLBACK_QUESTION
+            logger.exception("Gemini request failed")
+            raise exc
+
+
+class GroqProvider(BaseLLMProvider):
+
+    def _generate_text(self, prompt: str):
+
+        from groq import Groq
+
+        client = Groq(
+            api_key=settings.groq_api_key
+        )
+
+        response = client.chat.completions.create(
+
+            model=settings.groq_model,
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+
+        )
+
+        return response.choices[0].message.content
+
+    def generate_question(self, prompt: str):
+        return self._generate_text(prompt)
+
+    def evaluate_answer(self, prompt: str):
+        return self._generate_text(prompt)
+
+    def summarize_session(self, prompt: str):
+        return self._generate_text(prompt)
+
+
+class RouterProvider(BaseLLMProvider):
+
+    def generate_question(self, prompt: str) -> str:
+
+        try:
+            logger.info("Trying Gemini")
+
+            return GeminiProvider().generate_question(
+                prompt
+            )
+
+        except Exception as e:
+
+            logger.warning(
+                "Gemini failed switching to Groq: %s",
+                e
+            )
+
+            try:
+
+                logger.info("Trying Groq")
+
+                return GroqProvider().generate_question(
+                    prompt
+                )
+
+            except Exception as e:
+
+                logger.warning(
+                    "Groq failed switching to Mock: %s",
+                    e
+                )
+
+                return MockLLMProvider().generate_question(
+                    prompt
+                )
+
+    def evaluate_answer(self, prompt: str) -> str:
+
+        try:
+            logger.info("Trying Gemini")
+
+            return GeminiProvider().evaluate_answer(
+                prompt
+            )
+
+        except Exception as e:
+
+            logger.warning(
+                "Gemini failed switching to Groq: %s",
+                e
+            )
+
+            try:
+
+                logger.info("Trying Groq")
+
+                return GroqProvider().evaluate_answer(
+                    prompt
+                )
+
+            except Exception as e:
+
+                logger.warning(
+                    "Groq failed switching to Mock: %s",
+                    e
+                )
+
+                return MockLLMProvider().evaluate_answer(
+                    prompt
+                )
+
+    def summarize_session(self, prompt: str) -> str:
+
+        try:
+            logger.info("Trying Gemini")
+
+            return GeminiProvider().summarize_session(
+                prompt
+            )
+
+        except Exception as e:
+
+            logger.warning(
+                "Gemini failed switching to Groq: %s",
+                e
+            )
+
+            try:
+
+                logger.info("Trying Groq")
+
+                return GroqProvider().summarize_session(
+                    prompt
+                )
+
+            except Exception as e:
+
+                logger.warning(
+                    "Groq failed switching to Mock: %s",
+                    e
+                )
+
+                return MockLLMProvider().summarize_session(
+                    prompt
+                )
 
 
 def get_provider() -> BaseLLMProvider:
-    """Return the selected provider implementation."""
+
     provider_name = settings.llm_provider
 
     if provider_name == "gemini":
         return GeminiProvider()
+
+    if provider_name == "groq":
+        return GroqProvider()
+
+    if provider_name == "router":
+        return RouterProvider()
 
     return MockLLMProvider()
