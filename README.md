@@ -317,7 +317,7 @@ frontend/
 
 ### Pdf Report
 
-![pdf 1 Page](./iamges/pdf1.png)
+![pdf 1 Page](./iamges/pdf.png)
 ![pdf Page](./iamges/pdf2.png)
 
 ---
