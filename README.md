@@ -300,19 +300,25 @@ frontend/
 ### Home Screen
 
 ![Home Page](./iamges/first.png)
-<img src="./images/second.png" width="900"/>
 
 ### Interview Session
 
-(Add screenshot)
+![Interview Page](./iamges/second.png)
+
+![eva 1 Q Page](./iamges/third.png)
 
 ### Evaluation Screen
 
-(Add screenshot)
+![eva 5 Q Page](./iamges/fourth.png)
 
 ### Analytics Dashboard
 
-(Add screenshot)
+![simi Dashboard Page](./iamges/final.png)
+
+### Pdf Report
+
+![pdf 1 Page](./iamges/pdf1.png)
+![pdf Page](./iamges/pdf2.png)
 
 ---
 
