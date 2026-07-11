@@ -7,3 +7,10 @@ google-genai
 python-dotenv
 reportlab
 pandas
+sqlalchemy 
+psycopg2-binary 
+alembic 
+python-jose[cryptography] 
+passlib[bcrypt] 
+python-multipart
+email-validator

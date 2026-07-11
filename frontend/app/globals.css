@@ -1,15 +1,103 @@
 @import "tailwindcss";
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background: #071120;
-  color: white;
-  font-family: Inter, Arial, sans-serif;
-  min-height: 100vh;
+:root {
+  /* ========= Colors ========= */
+
+  --background: #071120;
+  --surface: #111827;
+  --surface-light: #1f2937;
+
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+
+  --secondary: #06b6d4;
+  --secondary-hover: #0891b2;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  --border: #273449;
+
+  /* ========= Radius ========= */
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* ========= Shadow ========= */
+
+  --shadow-card:
+    0 10px 30px rgba(0, 0, 0, .25);
+
+  --shadow-hover:
+    0 15px 40px rgba(99,102,241,.18);
+
+  /* ========= Animation ========= */
+
+  --transition:
+      all .25s ease;
 }
 
 * {
   box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body{
+  width:100%;
+  min-height:100%;
+  scroll-behavior:smooth;
+}
+
+body{
+
+  background:var(--background);
+
+  color:var(--text-primary);
+
+  font-family:Arial, Helvetica, sans-serif;
+
+  overflow-x:hidden;
+}
+
+button{
+
+  cursor:pointer;
+
+  transition:var(--transition);
+}
+
+button:hover{
+
+  transform:translateY(-2px);
+}
+
+input,
+textarea,
+select{
+
+  outline:none;
+
+  transition:var(--transition);
+}
+
+input:focus,
+textarea:focus{
+
+  border-color:var(--primary);
+}
+
+a{
+
+  text-decoration:none;
+
+  color:inherit;
 }
