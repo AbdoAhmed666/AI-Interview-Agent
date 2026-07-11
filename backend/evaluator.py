@@ -16,10 +16,10 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from .history import save_interview_history
-from .llm_provider import get_provider
-from .prompts import build_evaluation_prompt, build_session_summary_prompt
-from .schemas import EvaluationResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
+from history import save_interview_history
+from llm_provider import get_provider
+from prompts import build_evaluation_prompt, build_session_summary_prompt
+from schemas import EvaluationResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
 
 logger = logging.getLogger(__name__)
 

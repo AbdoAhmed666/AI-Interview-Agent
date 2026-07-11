@@ -3,8 +3,8 @@
 This file contains the question-generation logic for the interview flow.
 """
 
-from .llm_provider import BaseLLMProvider, get_provider
-from .prompts import build_interview_question_prompt
+from llm_provider import BaseLLMProvider, get_provider
+from prompts import build_interview_question_prompt
 
 
 provider: BaseLLMProvider = get_provider()

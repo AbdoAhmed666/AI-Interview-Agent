@@ -3,8 +3,10 @@
 This module keeps request and response contracts separate from API routes.
 """
 
-from pydantic import BaseModel, Field
+from datetime import datetime
 
+from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 class InterviewRequest(BaseModel):
     """Request payload for starting an interview."""
@@ -13,21 +15,26 @@ class InterviewRequest(BaseModel):
 
 
 class InterviewResponse(BaseModel):
-    """Response payload with a mock interview question."""
+    """Response payload for starting an interview."""
 
+    session_id: int
+    question_id: int
     role: str
     question: str
 
 
+# class EvaluationRequest(BaseModel):
+
+#     role: str
+
+#     question: str
+
+#     answer: str
+
+#     current_difficulty: int = Field(ge=1, le=5)
 class EvaluationRequest(BaseModel):
-
-    role: str
-
-    question: str
-
+    question_id: int
     answer: str
-
-    current_difficulty: int = Field(ge=1, le=5)
 
 
 class EvaluationResponse(BaseModel):
@@ -67,6 +74,8 @@ class AdaptiveEvaluationResponse(BaseModel):
 
     evaluation: EvaluationResponse
 
+    question_id: int
+
     next_question: str
 
     difficulty: int
@@ -105,3 +114,95 @@ class SessionSummaryResponse(BaseModel):
     overall_strengths: list[str]
     overall_weaknesses: list[str]
     hiring_recommendation: str
+
+
+from pydantic import BaseModel, EmailStr
+
+
+class UserRegister(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class FinishInterviewRequest(BaseModel):
+    session_id: int
+
+class FinishInterviewResponse(BaseModel):
+    overall_score: float
+    recommendation: str
+
+class Config:
+    orm_mode = True
+
+class InterviewSessionResponse(BaseModel):
+    id: int
+    role: str
+    status: str
+    overall_score: float | None
+    recommendation: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+class QuestionHistory(BaseModel):
+
+    id: int
+
+    question: str
+
+    answer: str | None
+
+    score: float | None
+
+    feedback: str | None
+
+    difficulty: int
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+class SessionDetails(BaseModel):
+
+    id: int
+
+    role: str
+
+    overall_score: float | None
+
+    recommendation: str | None
+
+    status: str
+
+    started_at: datetime
+
+    finished_at: datetime | None
+
+    questions: list[QuestionHistory]
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

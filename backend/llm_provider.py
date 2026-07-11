@@ -7,7 +7,7 @@ Future providers such as OpenAI, Gemini, or Groq can implement the same API.
 import logging
 from abc import ABC, abstractmethod
 
-from .config import settings
+from config import settings
 
 logger = logging.getLogger(__name__)
 
