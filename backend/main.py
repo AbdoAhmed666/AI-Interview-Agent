@@ -6,72 +6,51 @@ This file contains the API routes only.
 import os
 import sys
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+import logging
+
+try:
+    from pypdf.errors import PdfReadError
+except Exception:
+    PdfReadError = None
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from auth import router as auth_router
-from adaptive_engine import AdaptiveEngine
-
-from config import settings
-
-from evaluator import (
-    build_report_pdf,
-    evaluate_answer,
-    summarize_session,
-)
-
-from interview import generate_question
-
-from llm_provider import GeminiProvider, get_provider
-
-from schemas import (
-    AdaptiveEvaluationResponse,
-    EvaluationRequest,
-    EvaluationResponse,
-    FinishInterviewRequest,
-    FinishInterviewResponse,
-    InterviewRequest,
-    InterviewResponse,
-    InterviewSessionResponse,
-    ReportRequest,
-    SessionSummaryRequest,
-    SessionSummaryResponse,
-    SessionDetails,
-)
-
 
 from security import get_current_user
-from models import User
-from fastapi import Depends
 
-from sqlalchemy.orm import Session
-
-from database import get_db
-from crud import create_interview_session, create_question, get_question_by_id, get_session_by_id, update_question_result
-
-from services import (
-    calculate_overall_score,
-    get_recommendation,
-)
-
-from crud import (
-    finish_interview_session,
-    get_questions_by_session,
-    get_session_by_id,
-    get_session_with_questions, 
-)
-from crud import get_sessions_by_user
+from api.cv import router as cv_router
+from api.interview import router as interview_router
+from api.history import router as history_router
+from auth import router as auth_router
+from config import settings
+from evaluator import build_report_pdf, evaluate_answer, summarize_session
+from llm_provider import GeminiProvider, get_provider
+from schemas import EvaluationRequest, EvaluationResponse, InterviewRequest, InterviewResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
+from services.interview_service import InterviewService
 
 app = FastAPI(title="AI Interview Agent API")
-app.include_router(auth_router)
+
+# Configure CORS for the frontend origin(s)
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
+app.include_router(cv_router)
+app.include_router(interview_router)
+app.include_router(history_router)
+
+interview_service = InterviewService()
+
 
 @app.get("/")
 def read_root() -> dict[str, str]:
@@ -79,168 +58,37 @@ def read_root() -> dict[str, str]:
     return {"message": "AI Interview Agent backend is running."}
 
 
-@app.post("/start-interview", response_model=InterviewResponse)
+@app.post("/start-interview")
 def start_interview(
-    request: InterviewRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> InterviewResponse:
-    """Return a mock interview question for the selected role."""
-    interview_session = create_interview_session(
-        db=db,
-        user_id=current_user.id,
-        role=request.role,
-    )
-
-    question = generate_question(
-        role=request.role,
-        difficulty=3,
-    )
-
-    db_question = create_question(
-        db=db,
-        session_id=interview_session.id,
-        question=question,
-        difficulty=3,
-    )
-
-    return InterviewResponse(
-        session_id=interview_session.id,
-        question_id=db_question.id,
-        role=request.role,
-        question=db_question.question,
-    )
+    request: InterviewRequest, current_user=Depends(get_current_user)
+) -> dict[str, object]:
+    """Start the interview flow using the active CV and eligibility checks."""
+    try:
+        return interview_service.start_interview(user_id=current_user.id, role=request.role)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        # If the error was caused by PDF parsing/analysis, return a 502
+        # so the frontend can show a clear message instead of the server
+        # crashing or returning a generic 500/Network Error.
+        logging.exception("start_interview failed for user_id=%s: %s", getattr(current_user, 'id', None), exc)
+        if PdfReadError is not None and isinstance(exc, PdfReadError):
+            raise HTTPException(status_code=502, detail=f"CV analysis failed: {str(exc)}") from exc
+        # For other exceptions, re-raise as a 500 with detail to help debugging.
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/evaluate-answer", response_model=EvaluationResponse)
-def evaluate_answer_endpoint(
-    request: EvaluationRequest,
-    db: Session = Depends(get_db),
-) -> EvaluationResponse:
+def evaluate_answer_endpoint(request: EvaluationRequest) -> EvaluationResponse:
     """Evaluate a candidate answer and validate the returned JSON structure."""
     try:
-        db_question = get_question_by_id(
-            db,
-            request.question_id,
-        )
-
-        if db_question is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Question not found."
-            )
-        
-        db_session = get_session_by_id(
-            db,
-            db_question.session_id,
-        )
-
-        if db_session is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Question not found."
-            )
-
-        evaluation = evaluate_answer(
-            db_session.role,
-            db_question.question,
-            request.answer,
-            db_question.difficulty,
-        )
-
-        update_question_result(
-            db=db,
-            question=db_question,
-            answer=request.answer,
-            score=evaluation.score,
-            feedback=evaluation.feedback,
-        )
-        return evaluation
-        
+        return evaluate_answer(request.role, request.question, request.answer)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-@app.post(
-    "/adaptive-interview",
-    response_model=AdaptiveEvaluationResponse,
-)
-def adaptive_interview(
-    request: EvaluationRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdaptiveEvaluationResponse:
 
-    db_question = get_question_by_id(
-        db,
-        request.question_id,
-    )
-
-    if db_question is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Question not found.",
-        )
-
-    session = get_session_by_id(
-        db,
-        db_question.session_id,
-    )
-
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Interview session not found.",
-        )
-
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied.",
-        )
-
-    evaluation = evaluate_answer(
-        role=session.role,
-        question=db_question.question,
-        answer=request.answer,
-        difficulty=db_question.difficulty,
-    )
-
-    update_question_result(
-        db=db,
-        question=db_question,
-        answer=request.answer,
-        score=evaluation.score,
-        feedback=evaluation.feedback,
-    )
-
-    next_difficulty, decision = AdaptiveEngine.get_next_difficulty(
-        evaluation.level,
-        db_question.difficulty,
-    )
-
-    next_question = generate_question(
-        role=session.role,
-        difficulty=next_difficulty,
-    )   
-
-    new_question = create_question(
-        db=db,
-        session_id=session.id,
-        question=next_question,
-        difficulty=next_difficulty,
-    )
-
-    return AdaptiveEvaluationResponse(
-        evaluation=evaluation,
-        question_id=new_question.id,
-        next_question=new_question.question,
-        difficulty=next_difficulty,
-        decision=decision,
-    )
 
 @app.post("/summarize-session", response_model=SessionSummaryResponse)
-def summarize_session_endpoint(
-    request: SessionSummaryRequest,
-    current_user: User = Depends(get_current_user),) -> SessionSummaryResponse:
+def summarize_session_endpoint(request: SessionSummaryRequest) -> SessionSummaryResponse:
     """Generate a final summary for a complete interview session."""
     try:
         return summarize_session(request)
@@ -249,61 +97,11 @@ def summarize_session_endpoint(
 
 
 @app.post(
-    "/finish-interview",
-    response_model=FinishInterviewResponse,
-)
-def finish_interview(
-    request: FinishInterviewRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    session = get_session_by_id(
-        db,
-        request.session_id,
-    )
-
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Interview session not found.",
-        )
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied.",
-        )
-    questions = get_questions_by_session(
-        db,
-        session.id,
-    )
-    overall = calculate_overall_score(
-        questions,
-    )
-    recommendation = get_recommendation(
-        overall,
-    )
-
-    finish_interview_session(
-        db=db,
-        session=session,
-        overall_score=overall,
-        recommendation=recommendation,
-    )
-
-    return FinishInterviewResponse(
-        overall_score=overall,
-        recommendation=recommendation,
-    )
-
-
-@app.post(
     "/download-report",
     response_class=StreamingResponse,
     responses={200: {"content": {"application/pdf": {}}, "description": "PDF download"}},
 )
-def download_report(
-    request: ReportRequest,
-    current_user: User = Depends(get_current_user),) -> StreamingResponse:
+def download_report(request: ReportRequest) -> StreamingResponse:
     """Generate and return an interview report PDF in memory."""
     pdf_bytes = build_report_pdf(request)
     return StreamingResponse(
@@ -372,48 +170,3 @@ def debug_imports() -> dict[str, object]:
         import_result["genai_import_error_message"] = str(exc)
 
     return import_result
-
-@app.get(
-    "/my-sessions",
-    response_model=list[InterviewSessionResponse],
-)
-def my_sessions(
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db),
-    ):
-
-    return get_sessions_by_user(
-        db,
-        current_user.id,
-    )
-
-
-@app.get(
-    "/session/{session_id}",
-    response_model=SessionDetails,
-)
-def session_details(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-
-    session = get_session_with_questions(
-        db,
-        session_id,
-    )
-
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found.",
-        )
-
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied.",
-        )
-
-    return session
-

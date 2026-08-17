@@ -1,8 +1,15 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_DIR.parent
+RUNTIME_DIR = PROJECT_ROOT / ".runtime"
+
+# Support both documented startup locations: the repository root and backend/.
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(BACKEND_DIR / ".env", override=True)
 
 
 @dataclass(frozen=True)

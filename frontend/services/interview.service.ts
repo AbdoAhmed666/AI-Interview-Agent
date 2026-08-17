@@ -9,12 +9,14 @@ export async function startInterview(role: string) {
 }
 
 export async function evaluateAnswer(
+  sessionId: number,
   questionId: number,
   answer: string
 ) {
   const { data } = await api.post(
     "/adaptive-interview",
     {
+      session_id: sessionId,
       question_id: questionId,
       answer,
     }
@@ -37,14 +39,8 @@ export async function finishInterview(
 }
 
 export async function downloadReport(body:any){
-
-    const response=await api.post(
-        "/download-report",
-        body,
-        {
-            responseType:"blob",
-        }
-    );
-
-    return response.data;
+  // Download handled by report.service to centralize blob handling
+  // Keep this as a thin proxy for backward compatibility
+  const { downloadReport } = await import("./report.service");
+  return downloadReport(body);
 }

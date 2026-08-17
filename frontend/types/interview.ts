@@ -34,3 +34,30 @@ export interface InterviewState {
 
   recommendation?: string;
 }
+
+// Backend history/session response (mapped to camelCase in frontend)
+export interface SessionSummary {
+  id: number;
+  role: string;
+  status: string;
+  overallScore?: number | null;
+  recommendation?: string | null;
+}
+
+export interface SessionDetails {
+  id: number;
+  userId?: number | null;
+  role?: string;
+  status?: string;
+  sessionId?: number | null;
+  questionId?: number | null;
+  currentDifficulty?: number | null;
+  currentQuestion?: string | null;
+  questions?: string[];
+  answers?: string[];
+  questionNumber?: number | null;
+  evaluations?: any[];
+  overallScore?: number | null;
+  recommendation?: string | null;
+  pdfPath?: string | null;
+}

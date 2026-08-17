@@ -43,23 +43,27 @@ export default function useInterview() {
     try {
       const data = await startInterview(roleName);
 
-      setRole(roleName);
+      if (data?.eligible !== false) {
+        setRole(roleName);
 
-      setSessionId(data.session_id);
+        setSessionId(data.session_id);
 
-      setQuestionId(data.question_id);
+        setQuestionId(data.question_id);
 
-      setQuestion(data.question);
+        setQuestion(data.question ?? data.next_question ?? data.first_question);
 
-      setQuestionNumber(1);
+        setQuestionNumber(1);
 
-      setEvaluation(null);
+        setEvaluation(null);
 
-      setAnswer("");
+        setAnswer("");
 
-      setFinished(false);
+        setFinished(false);
 
-      setDifficulty(3);
+        setDifficulty(3);
+      }
+
+      return data;
     } finally {
       setLoading(false);
     }
@@ -68,12 +72,13 @@ export default function useInterview() {
   //--------------------------------
 
   async function submit() {
-    if (!questionId) return;
+    if (!questionId || !sessionId) return;
 
     setLoading(true);
 
     try {
       const data = await evaluateAnswer(
+        sessionId,
         questionId,
         answer
       );
@@ -86,14 +91,15 @@ export default function useInterview() {
 
       if (questionNumber >= totalQuestions) {
         const result = await finishInterview(
-          sessionId!
+          sessionId
         );
 
         setFinished(true);
 
         window.location.href="/history";
 
-        setOverallScore(result.overall_score);
+        // backend returns `final_score`; map it into frontend `overallScore`
+        setOverallScore(result.final_score);
 
         setRecommendation(result.recommendation);
 

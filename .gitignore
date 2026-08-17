@@ -8,12 +8,33 @@
 # Environment
 
 .env
+.env.*
+!.env.example
 venv/
 .venv/
 
 # Data
 
 *.csv
+
+# Application runtime data (never commit user data or generated artifacts)
+/.runtime/
+/backend/uploads/
+/backend/temp/
+/temp/
+/backend/backend_index/
+/backend/test_index/
+/data/history.csv
+/backend/tmp_*.json
+/backend/knowledge_base/**/faiss.index
+/backend/knowledge_base/**/metadata.json
+
+# One-off local debugging scripts and generated test inputs
+/backend/debug_cv_flow.ps1
+/backend/verify_interview_flow.py
+/backend_test_*.py
+/create_test_pdf.py
+/get_token.py
 
 # Node
 

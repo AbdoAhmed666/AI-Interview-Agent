@@ -16,10 +16,16 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from history import save_interview_history
-from llm_provider import get_provider
-from prompts import build_evaluation_prompt, build_session_summary_prompt
-from schemas import EvaluationResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
+try:
+    from .history import save_interview_history
+    from .llm_provider import get_provider
+    from .prompts import build_evaluation_prompt, build_session_summary_prompt
+    from .schemas import EvaluationResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
+except ImportError:  # pragma: no cover - supports direct script imports in tests
+    from history import save_interview_history
+    from llm_provider import get_provider
+    from prompts import build_evaluation_prompt, build_session_summary_prompt
+    from schemas import EvaluationResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +44,9 @@ def _extract_json_payload(text: str) -> str:
     return cleaned.strip()
 
 
-def evaluate_answer(
-        role: str,
-        question: str,
-        answer: str,
-        difficulty: int
-) -> EvaluationResponse:
+def evaluate_answer(role: str, question: str, answer: str) -> EvaluationResponse:
     """Generate an evaluation result and validate it before returning it."""
-    prompt = build_evaluation_prompt(
-        role=role,
-        question=question,
-        answer=answer,
-        difficulty=difficulty
-    )
+    prompt = build_evaluation_prompt(role=role, question=question, answer=answer, difficulty="medium")
     raw_response = get_provider().evaluate_answer(prompt)
 
     if logger.handlers:
@@ -101,8 +97,11 @@ def summarize_session(session: SessionSummaryRequest) -> SessionSummaryResponse:
         raise ValueError(f"Invalid session summary JSON returned by provider: {exc}") from exc
 
 
-def build_report_pdf(report: ReportRequest) -> bytes:
+def build_report_pdf(report: ReportRequest | dict) -> bytes:
     """Generate a PDF report in memory for the provided interview summary."""
+    if not isinstance(report, ReportRequest):
+        report = ReportRequest.model_validate(report)
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=LETTER, title="AI Interview Report")
 
@@ -110,32 +109,57 @@ def build_report_pdf(report: ReportRequest) -> bytes:
     title_style = styles["Heading1"]
     heading_style = styles["Heading2"]
     body_style = styles["BodyText"]
-    title_style.spaceAfter = 20
-    heading_style.spaceAfter = 10
-    body_style.spaceAfter = 5
 
     story = []
-    story.append(Paragraph("<b>AI Interview Report</b>", title_style))
-    story.append(Spacer(1, 5))
-    story.append(Paragraph("<font color='grey'>Generated AI-powered interview analysis</font>", body_style))
-    story.append(Spacer(1, 15))
+    story.append(Paragraph("AI Interview Report", title_style))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(f"Interview Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", body_style))
+    story.append(Spacer(1, 12))
 
-    first_eval = report.evaluations[0]
-    eval_dict = (
-        first_eval.model_dump()
-        if hasattr(first_eval, "model_dump")
-        else first_eval.dict()
+    summary_data = [
+        ["Candidate Role", report.role],
+        ["Score", f"{report.overall_score}/10"],
+    ]
+    summary_table = Table(summary_data, colWidths=[160, 340])
+    summary_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5EEF7")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+            ]
+        )
     )
+    story.append(summary_table)
+    story.append(Spacer(1, 18))
 
-    story.append(Paragraph(f"<b>First Question Level:</b> {eval_dict.get('level', 'N/A')}", body_style))
+    def add_section(title: str, content: str | list[str]) -> None:
+        story.append(Paragraph(title, heading_style))
+        story.append(Spacer(1, 6))
+        if isinstance(content, list):
+            for item in content:
+                story.append(Paragraph(f"• {item}", body_style))
+        else:
+            story.append(Paragraph(content, body_style))
+        story.append(Spacer(1, 12))
+
+    # add_section("Interview Question", report.question)
+    # add_section("Candidate Answer", report.answer)
+    # add_section("Strengths", report.strengths or ["No strengths provided."])
+    # add_section("Weaknesses", report.weaknesses or ["No weaknesses provided."])
+    # add_section("Feedback", report.feedback)
+    # add_section("Follow-up Question", report.follow_up_question)
+    # story.append(Spacer(1, 24))
+
+    # =========================
+    # EXECUTIVE SUMMARY
+    # =========================
+
+    story.append(Paragraph("Interview Summary", heading_style))
     story.append(Spacer(1, 10))
-
-    story.append(Paragraph("<b>Concept Gaps (Sample):</b>", body_style))
-
-    for gap in eval_dict.get("concept_gaps", [])[:5]:
-        story.append(Paragraph(f"• {gap}", body_style))
-
-    story.append(Spacer(1, 15))
 
     summary_data = [
         ["Role", report.role],
@@ -174,25 +198,17 @@ def build_report_pdf(report: ReportRequest) -> bytes:
 
     story.append(Paragraph("Question Scores", heading_style))
 
-    score_table_data = [["Question", "Score", "Level"]]
+    score_table_data = [["Question", "Score"]]
 
     for i, evaluation in enumerate(report.evaluations):
-
-        eval_dict = (
-            evaluation.model_dump()
-            if hasattr(evaluation, "model_dump")
-            else evaluation.dict()
-        )
-
         score_table_data.append(
             [
                 f"Question {i+1}",
-                str(eval_dict.get("score", "N/A")),
-                eval_dict.get("level", "N/A")
+                str(evaluation.get("score", "N/A")),
             ]
         )
 
-    score_table = Table(score_table_data,colWidths=[220, 80, 100])
+    score_table = Table(score_table_data, colWidths=[300, 100])
 
     score_table.setStyle(
         TableStyle(
@@ -215,7 +231,9 @@ def build_report_pdf(report: ReportRequest) -> bytes:
     story.append(Paragraph("Interview Details", heading_style))
     story.append(Spacer(1, 10))
 
-    for i, question in enumerate(report.questions):
+    for i, (question, answer, evaluation) in enumerate(
+        zip(report.questions, report.answers, report.evaluations)
+    ):
 
         story.append(
             Paragraph(
@@ -224,8 +242,12 @@ def build_report_pdf(report: ReportRequest) -> bytes:
             )
         )
 
-        story.append(Paragraph(f"<b>Q{i+1}:</b> {question}", body_style))
-        story.append(Spacer(1, 5))
+        story.append(
+            Paragraph(
+                question,
+                body_style,
+            )
+        )
 
         story.append(
             Paragraph(
@@ -234,49 +256,26 @@ def build_report_pdf(report: ReportRequest) -> bytes:
             )
         )
 
-        story.append(Paragraph("<b>Answer:</b>", body_style))
-        story.append(Paragraph(report.answers[i], body_style))
-
-        evaluation = report.evaluations[i]
-
-        eval_dict = evaluation.model_dump() if hasattr(evaluation, "model_dump") else evaluation.dict()
-
         story.append(
             Paragraph(
-                f"<b>Score:</b> {eval_dict.get('score', 'N/A')}/10",
+                answer,
                 body_style,
             )
         )
 
         story.append(
             Paragraph(
-                f"<b>Level:</b> {eval_dict.get('level', 'N/A')}",
+                f"<b>Score:</b> {evaluation.get('score', 'N/A')}/10",
                 body_style,
             )
         )
 
         story.append(
             Paragraph(
-                f"<b>Feedback:</b> {eval_dict.get('feedback', '')}",
+                f"<b>Feedback:</b> {evaluation.get('feedback', '')}",
                 body_style,
             )
         )
-
-        story.append(
-            Paragraph(
-                "<b>Concept Gaps:</b>",
-                body_style,
-            )
-        )
-
-        for gap in eval_dict.get("concept_gaps", []):
-
-            story.append(
-                Paragraph(
-                    f"- {gap}",
-                    body_style,
-                )
-            )
 
         story.append(
             Spacer(1, 15)

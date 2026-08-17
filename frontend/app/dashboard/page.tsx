@@ -5,10 +5,11 @@ import { useEffect,useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 
 import { getMySessions } from "@/services/history.service";
+import type { SessionSummary } from "@/types/interview";
 
 export default function DashboardPage(){
 
-    const [sessions,setSessions]=useState<any[]>([]);
+    const [sessions,setSessions]=useState<SessionSummary[]>([]);
 
     useEffect(()=>{
 
@@ -19,8 +20,8 @@ export default function DashboardPage(){
     const interviews=sessions.length;
 
     const scores=sessions
-        .filter((x)=>x.overall_score!=null)
-        .map((x)=>x.overall_score);
+        .filter((x)=>x.overallScore!=null)
+        .map((x)=>x.overallScore as number);
 
     const avg=scores.length
         ?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1)
@@ -28,7 +29,7 @@ export default function DashboardPage(){
 
     const best=scores.length
         ?Math.max(...scores)
-        :"0";
+        :0;
 
     return(
 

@@ -57,17 +57,17 @@ export function AuthProvider({
 
   async function loadUser() {
     try {
-      if (!getToken()) {
-        setLoading(false);
-        return;
+      // Only attempt to load user if a token is present
+      const token = getToken();
+      if (token) {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } else {
+        setUser(null);
       }
-
-      const currentUser =
-        await getCurrentUser();
-
-      setUser(currentUser);
     } catch {
       removeToken();
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -76,15 +76,15 @@ export function AuthProvider({
   async function login(
     data: LoginRequest
   ) {
-    const token =
-      await loginService(data);
-
-    saveToken(token.access_token);
-
-    const currentUser =
-      await getCurrentUser();
-
-    setUser(currentUser);
+    const tokenResp = await loginService(data);
+    const token = typeof tokenResp === "string" ? tokenResp : tokenResp?.access_token;
+    if (token) {
+      saveToken(token);
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+    } else {
+      throw new Error("Login failed: no token returned");
+    }
   }
 
   function logout() {

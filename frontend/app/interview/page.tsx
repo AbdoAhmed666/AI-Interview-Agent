@@ -1,6 +1,9 @@
   "use client";
 
   import AppShell from "@/components/layout/AppShell";
+  import { useAuth } from "@/contexts/AuthContext";
+  import { useEffect } from "react";
+  import { useRouter } from "next/navigation";
 
   import RoleSelector from "@/components/interview/RoleSelector";
   import QuestionCard from "@/components/interview/QuestionCard";
@@ -10,6 +13,14 @@
   import ProgressBar from "@/components/interview/ProgressBar";
 
   export default function InterviewPage() {
+    const { loading, isAuthenticated } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+      if (!loading && !isAuthenticated) {
+        router.replace("/login");
+      }
+    }, [loading, isAuthenticated, router]);
     return (
       <AppShell>
 
