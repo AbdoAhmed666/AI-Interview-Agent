@@ -167,7 +167,7 @@ export default function RoleSelector() {
       </div>
 
       {compatMessage && (
-        <div className="mt-4 rounded-md p-3 bg-yellow-50 border border-yellow-200">
+        <div className="mt-4 rounded-md border border-yellow-200 bg-black p-3">
           <div className="font-semibold">Role compatibility</div>
           <div className="text-sm mt-1">{compatMessage}</div>
           {compatScore !== null && (

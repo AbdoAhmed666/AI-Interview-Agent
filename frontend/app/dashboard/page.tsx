@@ -1,110 +1,17 @@
 "use client";
 
-import { useEffect,useState } from "react";
-
+import {useEffect,useMemo,useState} from "react";
+import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
+import {useAuth} from "@/contexts/AuthContext";
+import {getMySessions} from "@/services/history.service";
+import type {SessionSummary} from "@/types/interview";
 
-import { getMySessions } from "@/services/history.service";
-import type { SessionSummary } from "@/types/interview";
+const title=(role:string)=>role.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+function Empty({children}:{children:React.ReactNode}){return <div className="flex min-h-55 items-center justify-center rounded-xl border border-dashed border-[var(--border)] px-6 text-center text-sm text-[var(--muted)]">{children}</div>}
+function Trend({scores}:{scores:number[]}){if(scores.length<2)return <Empty>Complete more interviews to unlock your performance trend.</Empty>;const max=10,min=0;const pts=scores.map((v,i)=>`${i/(scores.length-1)*100},${100-((v-min)/(max-min)*100)}`).join(" ");return <div className="h-56"><svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Interview score trend"><path d="M0 0V100H100" fill="none" stroke="rgba(148,163,184,.18)" strokeWidth=".5"/><polyline points={pts} fill="none" stroke="#8b7cff" strokeWidth="2" vectorEffect="non-scaling-stroke"/><polyline points={`${pts} 100,100 0,100`} fill="rgba(124,108,255,.12)"/><g>{scores.map((v,i)=><circle key={i} cx={i/(scores.length-1)*100} cy={100-v*10} r="2.2" fill="#c5c0ff"><title>Interview {i+1}: {v}/10</title></circle>)}</g></svg><div className="mt-2 flex justify-between text-xs text-[var(--muted)]"><span>Earlier interviews</span><span>Latest interview</span></div></div>}
 
-export default function DashboardPage(){
-
-    const [sessions,setSessions]=useState<SessionSummary[]>([]);
-
-    useEffect(()=>{
-
-        getMySessions().then(setSessions);
-
-    },[]);
-
-    const interviews=sessions.length;
-
-    const scores=sessions
-        .filter((x)=>x.overallScore!=null)
-        .map((x)=>x.overallScore as number);
-
-    const avg=scores.length
-        ?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1)
-        :"0";
-
-    const best=scores.length
-        ?Math.max(...scores)
-        :0;
-
-    return(
-
-        <AppShell>
-
-            <h1 className="text-4xl font-bold mb-2">
-
-                Welcome Back 👋
-
-            </h1>
-
-            <p className="text-gray-400 mb-8">
-
-                Ready for your next AI interview?
-
-            </p>
-
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
-
-                <div className="rounded-xl bg-[var(--surface)] p-6">
-
-                    <p>Interviews</p>
-
-                    <h2 className="text-4xl font-bold">
-
-                        {interviews}
-
-                    </h2>
-
-                </div>
-
-                <div className="rounded-xl bg-[var(--surface)] p-6">
-
-                    <p>Average Score</p>
-
-                    <h2 className="text-4xl font-bold">
-
-                        {avg}
-
-                    </h2>
-
-                </div>
-
-                <div className="rounded-xl bg-[var(--surface)] p-6">
-
-                    <p>Best Score</p>
-
-                    <h2 className="text-4xl font-bold">
-
-                        {best}
-
-                    </h2>
-
-                </div>
-
-                <div className="rounded-xl bg-[var(--surface)] p-6">
-
-                    <p>Completed</p>
-
-                    <h2 className="text-4xl font-bold">
-
-                        {
-                            sessions.filter(
-                                s=>s.status==="completed"
-                            ).length
-                        }
-
-                    </h2>
-
-                </div>
-
-            </div>
-
-        </AppShell>
-
-    );
-
-}
+export default function DashboardPage(){const {user}=useAuth();const [sessions,setSessions]=useState<SessionSummary[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(false);useEffect(()=>{getMySessions().then(setSessions).catch(()=>setError(true)).finally(()=>setLoading(false))},[]);
+ const completed=useMemo(()=>sessions.filter(s=>s.status==="completed"&&s.overallScore!=null),[sessions]);const scores=completed.map(s=>s.overallScore as number);const average=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;const best=scores.length?Math.max(...scores):0;const completion=sessions.length?Math.round(completed.length/sessions.length*100):0;const roles=useMemo(()=>Object.entries(completed.reduce<Record<string,{sum:number,count:number}>>((a,s)=>{const k=s.role;a[k]??={sum:0,count:0};a[k].sum+=s.overallScore as number;a[k].count++;return a},{})).map(([role,v])=>({role,avg:v.sum/v.count})).sort((a,b)=>b.avg-a.avg),[completed]);
+ const cards=[['Total interviews',sessions.length,'All saved assessment sessions'],['Average score',scores.length?average.toFixed(1)+' / 10':'—','Completed interviews only'],['Best score',scores.length?best.toFixed(1)+' / 10':'—','Your highest recorded score'],['Completion rate',sessions.length?completion+'%':'—',sessions.length?'Completed sessions':'Start an interview to begin']];
+ return <AppShell><main className="space-y-6"><section className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between"><div><p className="eyebrow">Assessment analytics</p><h1 className="page-title mt-2">Welcome back, {user?.name?.split(' ')[0]??'there'}</h1><p className="muted mt-2">Track your technical interview performance and identify where to improve.</p></div><div className="flex gap-3"><Link href="/history" className="chip">View history</Link><Link href="/interview" className="rounded-xl bg-[var(--primary)] px-4 py-2 font-bold">Start interview</Link></div></section>{error?<div className="panel p-6 text-red-200">Unable to load dashboard analytics. Please refresh the page.</div>:<>{!loading&&sessions.length===0?<section className="panel p-8 text-center"><p className="eyebrow">Your first assessment</p><h2 className="mt-2 text-2xl font-bold">Start your first AI interview</h2><p className="muted mx-auto mt-3 max-w-lg">Practice with an adaptive technical interviewer and track your progress over time.</p><div className="mt-5 flex justify-center gap-3"><Link href="/interview" className="rounded-xl bg-[var(--primary)] px-4 py-2 font-bold">Start Interview</Link><Link href="/profile" className="chip">Upload CV</Link></div></section>:<><section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label,value,caption])=><article key={String(label)} className="panel p-5"><p className="eyebrow">{label}</p><p className="metric mt-3">{loading?'—':value}</p><p className="muted mt-2 text-sm">{caption}</p></article>)}</section><section className="grid gap-6 xl:grid-cols-[1.4fr_.9fr]"><article className="panel p-6"><p className="eyebrow">Performance trend</p><h2 className="mt-2 text-xl font-bold">Score progression</h2><div className="mt-5"><Trend scores={scores.slice().reverse()}/></div></article><article className="panel p-6"><p className="eyebrow">Performance by role</p><h2 className="mt-2 text-xl font-bold">Average score</h2><div className="mt-5 space-y-5">{roles.length?roles.map(r=><div key={r.role}><div className="mb-2 flex justify-between text-sm"><span>{title(r.role)}</span><b>{r.avg.toFixed(1)} / 10</b></div><div className="h-2 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-[var(--primary)]" style={{width:`${r.avg*10}%`}}/></div></div>):<Empty>Complete interviews across different roles to compare your performance.</Empty>}</div></article></section><section className="grid gap-6 lg:grid-cols-[.9fr_1.4fr]"><article className="panel p-6"><p className="eyebrow">Performance insights</p><h2 className="mt-2 text-xl font-bold">From your real results</h2><div className="mt-5 space-y-3 text-sm">{scores.length>0&&<p className="rounded-xl bg-white/4 p-3">Your average completed-interview score is <b>{average.toFixed(1)} / 10</b>.</p>}{roles[0]&&<p className="rounded-xl bg-white/4 p-3">Your strongest recorded role is <b>{title(roles[0].role)}</b>.</p>}<p className="rounded-xl bg-white/4 p-3">You have completed <b>{completed.length}</b> interview{completed.length===1?'':'s'}.</p></div></article><article className="panel p-6"><div className="flex items-center justify-between"><div><p className="eyebrow">Recent interviews</p><h2 className="mt-2 text-xl font-bold">Latest activity</h2></div><Link href="/history" className="muted text-sm">View all →</Link></div><div className="mt-4 divide-y divide-[var(--border)]">{sessions.slice(0,5).map(s=><div className="flex items-center justify-between gap-3 py-3" key={s.id}><div><p className="font-semibold">{title(s.role)}</p><p className="muted text-sm">{s.recommendation??'No recommendation yet'}</p></div><div className="flex items-center gap-3"><span className={`status ${s.status==='completed'?'status-completed':'status-progress'}`}>{s.status}</span><span className="font-bold">{s.overallScore??'—'}</span><Link className="chip" href={`/history/${s.id}`}>View</Link></div></div>)}</div></article></section></>}</>}</main></AppShell>}
