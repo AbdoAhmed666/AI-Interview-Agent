@@ -15,6 +15,10 @@ The system is built with **FastAPI, Next.js, PostgreSQL, Gemini, Groq, FAISS, Se
 
 ---
 
+# Demo Video In LinkedIn
+
+https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio
+
 
 ## 🚀 Why AI Interview Agent?
 
