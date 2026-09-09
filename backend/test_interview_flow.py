@@ -54,11 +54,66 @@ class DummyParser:
         return SimpleNamespace(content="experience with backend systems")
 
 
+class DummyAnalyzer:
+    def analyze(self, content):
+        return SimpleNamespace(skills=["python"])
+
+
+class DummyEligibility:
+    def evaluate(self, analysis, role):
+        return SimpleNamespace(
+            eligible=True,
+            message="eligible",
+            score=100.0,
+            recommended_roles=[],
+        )
+
+
+def test_start_interview_creates_process_local_session_state():
+    manager = InterviewManager()
+    manager.storage = SimpleNamespace(
+        has_cv=lambda user_id: True,
+        get_active_cv=lambda user_id: Path("dummy.pdf"),
+    )
+    manager.parser = DummyParser()
+    manager.analyzer = DummyAnalyzer()
+    manager.eligibility = DummyEligibility()
+    manager.rag = DummyRAG()
+    manager.query_builder = DummyQueryBuilder()
+    manager.prompt_builder = DummyPromptBuilder()
+    manager.provider = DummyProvider()
+
+    response = manager.start_interview(user_id=7, role="backend")
+
+    assert response["eligible"] is True
+    assert response["session_id"] in manager._sessions
+    assert manager._sessions[response["session_id"]]["user_id"] == 7
+    assert response["question_id"] in manager._question_to_session
+
+
 def test_interview_service_reuses_a_single_manager():
     first_service = InterviewService()
     second_service = InterviewService()
 
     assert first_service.manager is second_service.manager
+
+
+def test_interview_service_mappings_are_instance_local():
+    first_service = InterviewService()
+    second_service = InterviewService()
+
+    first_service._db_to_manager[123] = 456
+
+    assert second_service._db_to_manager.get(123) is None
+
+
+def test_recreating_manager_loses_active_session_state():
+    first_manager = InterviewManager()
+    first_manager._sessions[123] = {"role": "backend"}
+
+    second_manager = InterviewManager()
+
+    assert 123 not in second_manager._sessions
 
 
 def test_submit_answer_returns_evaluation_and_next_question():

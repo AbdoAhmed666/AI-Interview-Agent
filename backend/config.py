@@ -38,6 +38,10 @@ class Settings:
         "mock"
     ).strip().lower()
 
+    interview_recovery_stale_seconds: int = int(
+        os.getenv("INTERVIEW_RECOVERY_STALE_SECONDS", "300")
+    )
+
     # Database
     database_url: str = os.getenv("DATABASE_URL", "")
 

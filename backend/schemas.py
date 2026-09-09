@@ -4,6 +4,7 @@ This module keeps request and response contracts separate from API routes.
 """
 
 from pydantic import BaseModel, Field
+from enum import Enum
 from typing import Literal, Optional
 
 
@@ -13,6 +14,29 @@ InterviewRole = Literal[
     "ml",
     "data_science",
 ]
+
+
+class SessionStatus(str, Enum):
+    IN_PROGRESS = "IN_PROGRESS"
+    GENERATING = "GENERATING"
+    GENERATION_FAILED = "GENERATION_FAILED"
+    READY_TO_FINISH = "READY_TO_FINISH"
+    COMPLETED = "COMPLETED"
+
+
+class QuestionStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    EVALUATING = "EVALUATING"
+    EVALUATION_FAILED = "EVALUATION_FAILED"
+    EVALUATED = "EVALUATED"
+    LEGACY_EVALUATED = "LEGACY_EVALUATED"
+    LEGACY_ARCHIVED = "LEGACY_ARCHIVED"
+
+
+class EvaluationLevel(str, Enum):
+    WEAK = "weak"
+    MEDIUM = "medium"
+    STRONG = "strong"
 
 
 class InterviewRequest(BaseModel):
@@ -65,12 +89,17 @@ class EvaluationResponse(BaseModel):
     """Response payload with structured evaluation results."""
 
     score: int = Field(ge=0, le=10)
-    level: str
+    level: EvaluationLevel
     strengths: list[str]
     weaknesses: list[str]
     feedback: str
     concept_gaps: list[str]
     follow_up_question: str
+
+    model_config = {"extra": "forbid"}
+
+
+CanonicalEvaluation = EvaluationResponse
 
 
 class ReportRequest(BaseModel):
