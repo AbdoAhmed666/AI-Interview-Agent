@@ -180,4 +180,107 @@ def test_finish_rejects_non_ready_status():
                 db.get(InterviewSession, session_id).status
                 == SessionStatus.IN_PROGRESS.value
             )
-# __FINISH_TESTS_MARKER__
+def test_finish_rejects_unauthorized_owner():
+    with _persisted_ready_session() as session_id:
+        service = _service()
+        with pytest.raises(FinishForbidden):
+            service.finish_interview(user_id=10, session_id=session_id)
+        with _db() as db:
+            session = db.get(InterviewSession, session_id)
+            assert session.status == SessionStatus.READY_TO_FINISH.value
+            assert db.query(InterviewAuditLog).filter(
+                InterviewAuditLog.session_id == session_id,
+                InterviewAuditLog.event_type == "INTERVIEW_COMPLETED",
+            ).count() == 0
+
+
+def test_finish_rejects_missing_session():
+    with pytest.raises(FinishNotFoundError):
+        _service().finish_interview(user_id=USER_ID, session_id=999999)
+
+
+def test_finish_is_idempotent():
+    with _persisted_ready_session() as session_id:
+        service = _service()
+        first = service.finish_interview(user_id=USER_ID, session_id=session_id)
+        second = service.finish_interview(user_id=USER_ID, session_id=session_id)
+        assert first == second
+        assert first["status"] == SessionStatus.COMPLETED.value
+        assert first["overall_score"] == EXPECTED_SCORE
+        assert first["recommendation"] == EXPECTED_REC
+        with _db() as db:
+            assert db.query(InterviewAuditLog).filter(
+                InterviewAuditLog.session_id == session_id,
+                InterviewAuditLog.event_type == "INTERVIEW_COMPLETED",
+            ).count() == 1
+            assert db.get(InterviewSession, session_id).overall_score == EXPECTED_SCORE
+
+
+def test_finish_atomicity_on_persistence_failure(monkeypatch):
+    with _persisted_ready_session() as session_id:
+        def _boom(*args, **kwargs):
+            raise RuntimeError("persistence failure")
+
+        monkeypatch.setattr(interview_service_module, "update_session_state", _boom)
+        service = _service()
+        with pytest.raises(RuntimeError, match="persistence failure"):
+            service.finish_interview(user_id=USER_ID, session_id=session_id)
+        with _db() as db:
+            session = db.get(InterviewSession, session_id)
+            assert session.status == SessionStatus.READY_TO_FINISH.value
+            assert session.overall_score is None
+            assert session.recommendation is None
+            assert session.finished_at is None
+            assert db.query(InterviewAuditLog).filter(
+                InterviewAuditLog.session_id == session_id,
+                InterviewAuditLog.event_type == "INTERVIEW_COMPLETED",
+            ).count() == 0
+
+
+def test_finish_ignores_legacy_archived_question():
+    now = datetime.utcnow()
+    extra = [
+        {
+            "question": "legacy archived question",
+            "difficulty": 3,
+            "question_number": None,
+            "status": QuestionStatus.LEGACY_ARCHIVED.value,
+            "answer": None,
+            "evaluation": None,
+            "score": None,
+            "feedback": None,
+            "evaluated_at": None,
+            "answer_submitted_at": None,
+            "created_at": now,
+        }
+    ]
+    with _persisted_ready_session(extra_questions=extra) as session_id:
+        result = _service().finish_interview(user_id=USER_ID, session_id=session_id)
+        assert result["status"] == SessionStatus.COMPLETED.value
+        assert result["overall_score"] == EXPECTED_SCORE
+        assert result["recommendation"] == EXPECTED_REC
+        assert result["questions_evaluated"] == 5
+
+
+def test_question_number_six_is_rejected_by_schema():
+    session_id = _create_evaluated_session(scores=[8, 8, 8, 8, 8])
+    try:
+        db = SessionLocal()
+        try:
+            db.add(
+                InterviewQuestion(
+                    session_id=session_id,
+                    question="should be rejected",
+                    difficulty=3,
+                    question_number=6,
+                    status=QuestionStatus.EVALUATED.value,
+                    score=8.0,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                db.flush()
+            db.rollback()
+        finally:
+            db.close()
+    finally:
+        _delete_session_tree(session_id)
