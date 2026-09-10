@@ -98,15 +98,6 @@ def test_interview_service_reuses_a_single_manager():
     assert first_service.manager is second_service.manager
 
 
-def test_interview_service_mappings_are_instance_local():
-    first_service = InterviewService()
-    second_service = InterviewService()
-
-    first_service._db_to_manager[123] = 456
-
-    assert second_service._db_to_manager.get(123) is None
-
-
 def test_recreating_manager_loses_active_session_state():
     first_manager = InterviewManager()
     first_manager._sessions[123] = {"role": "backend"}

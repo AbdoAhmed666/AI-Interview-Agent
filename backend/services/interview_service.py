@@ -10,9 +10,6 @@ except ImportError:  # pragma: no cover - fallback for direct execution
 
 from database import SessionLocal
 from sqlalchemy.orm import Session
-from crud import (
-    update_question_result,
-)
 from repositories.interview_repository import (
     create_audit_event,
     create_session,
@@ -80,8 +77,11 @@ class FinishConflict(FinishError):
 class InterviewService:
     """Coordinate the interview workflow and persist sessions/questions to the DB.
 
-    This service keeps the adaptive InterviewManager in-memory for live interviews
-    but stores authoritative records in the database. It maps manager IDs to DB IDs.
+    PostgreSQL is the authoritative source of truth for interview workflow
+    state. The shared :class:`InterviewManager` is retained only as a holder of
+    stateless AI/domain helpers (CV storage, parsing, analysis, eligibility,
+    RAG, prompt building, and the LLM provider). It is never consulted as
+    workflow state, and no process-local id mappings are kept.
     """
 
     _shared_manager: InterviewManager | None = None
@@ -89,13 +89,9 @@ class InterviewService:
     def __init__(self) -> None:
         if InterviewService._shared_manager is None:
             InterviewService._shared_manager = InterviewManager()
+        # The manager is used only for its stateless AI/domain helper
+        # components; its in-memory session bookkeeping is never read.
         self.manager = InterviewService._shared_manager
-
-        # mappings between in-memory manager ids and persistent DB ids
-        self._manager_to_db: dict[int, int] = {}
-        self._db_to_manager: dict[int, int] = {}
-        self._manager_q_to_db_q: dict[int, int] = {}
-        self._db_q_to_manager_q: dict[int, int] = {}
 
     @staticmethod
     def _start_durable_session(
@@ -143,60 +139,54 @@ class InterviewService:
         return db_session, db_question
 
     def start_interview(self, user_id: int, role: str) -> dict[str, Any]:
-        """Start an interview using the adaptive manager and persist a DB session/question.
+        """Start an interview: check eligibility, then persist a durable session + Q1.
 
-        The InterviewManager is used only as an AI/domain helper to source the
-        first question text. The authoritative session and question #1 are
-        created in PostgreSQL by :meth:`_start_durable_session` inside a single
-        caller-owned transaction, so the returned ``question_id`` always refers
-        to a durable row.
+        PostgreSQL is the sole workflow authority. The InterviewManager is used
+        only for its stateless AI/domain helpers (CV storage, parsing, analysis,
+        eligibility, and — via :meth:`_generate_question_text` — RAG/prompt/LLM).
+        No process-local manager session state or id mappings are created; the
+        returned ``session_id`` and ``question_id`` are always durable DB rows.
 
-        Returns a payload where ``session_id`` and ``question_id`` are the
-        database ids, which the frontend should use for subsequent requests.
+        The authoritative session and question #1 are created in PostgreSQL by
+        :meth:`_start_durable_session` inside a single caller-owned transaction,
+        so a failure while persisting Q1 rolls the session back as well.
         """
-        import logging
+        # Eligibility uses only stateless domain helpers; it never touches
+        # manager workflow state.
+        if not self.manager.storage.has_cv(user_id):
+            raise FileNotFoundError("Please upload your CV first.")
 
-        logger = logging.getLogger("interview.service")
-
-        result = self.manager.start_interview(
-            user_id=user_id,
-            role=role,
+        cv_path = self.manager.storage.get_active_cv(user_id)
+        document = self.manager.parser.parse(
+            file_path=cv_path,
+            role="user",
+            document_type="cv",
         )
+        analysis = self.manager.analyzer.analyze(document.content)
 
-        logger.debug(
-            "manager.start_interview eligible=%s session_id=%s",
-            result.get("eligible"),
-            result.get("session_id"),
+        eligibility_result = self.manager.eligibility.evaluate(analysis, role)
+        if not eligibility_result.eligible:
+            # Not compatible with the CV: return eligibility without creating a
+            # DB session/question.
+            return {
+                "eligible": False,
+                "message": eligibility_result.message,
+                "score": eligibility_result.score,
+                "recommended_roles": [
+                    item.role for item in eligibility_result.recommended_roles
+                ],
+            }
+
+        difficulty = 3
+        first_question = self._validate_generated_question(
+            self._generate_question_text(
+                user_id=user_id,
+                role=role,
+                difficulty=difficulty,
+            )
         )
-
-        # If the role is not compatible with the user's CV,
-        # return the eligibility result without creating a DB session/question.
-        if result.get("eligible") is False:
-            return result
-
-        manager_session_id = result.get("session_id")
-        manager_question_id = result.get("question_id")
-        first_question = result.get("question") or result.get("first_question")
-        difficulty = result.get("difficulty") or 3
-
-        # Safety checks before touching the database.
-        if manager_session_id is None:
-            raise RuntimeError(
-                "Interview manager did not return a session_id"
-            )
-
-        if manager_question_id is None:
-            raise RuntimeError(
-                "Interview manager did not return a question_id"
-            )
-
-        if not first_question:
-            raise RuntimeError(
-                "Interview manager did not return the first question"
-            )
 
         db = SessionLocal()
-
         try:
             with db.begin():
                 db_session, db_question = self._start_durable_session(
@@ -204,23 +194,19 @@ class InterviewService:
                     user_id=user_id,
                     role=role,
                     first_question=first_question,
-                    difficulty=int(difficulty),
+                    difficulty=difficulty,
                 )
                 # Capture PKs before commit while they are guaranteed loaded.
                 session_id = db_session.id
                 question_id = db_question.id
 
-            # Map process-local manager IDs to persistent DB IDs for the live
-            # interview path. Written only after the transaction commits, so a
-            # rollback cannot leave the mapping in an inconsistent state.
-            self._manager_to_db[manager_session_id] = session_id
-            self._db_to_manager[session_id] = manager_session_id
-            self._manager_q_to_db_q[manager_question_id] = question_id
-            self._db_q_to_manager_q[question_id] = manager_question_id
-
-            # Return DB ids to the frontend.
             return {
-                **result,
+                "eligible": True,
+                "role": role,
+                "difficulty": difficulty,
+                "next_question": first_question,
+                "first_question": first_question,
+                "question": first_question,
                 "session_id": session_id,
                 "question_id": question_id,
             }
@@ -837,48 +823,7 @@ class InterviewService:
             "evaluation": None,
         }
 
-    def submit_answer(self, user_id: int, session_id: int, question_id: int, answer: str) -> dict[str, Any]:
-        """Persist the answer/evaluation and ask the manager to produce the next question.
-
-        The `session_id` and `question_id` passed in are expected to be DB ids.
-        """
-        # translate DB ids to manager ids
-        manager_session_id = self._db_to_manager.get(session_id)
-        manager_question_id = self._db_q_to_manager_q.get(question_id)
-
-        if manager_session_id is None or manager_question_id is None:
-            raise KeyError("Unknown session or question id")
-
-        result = self.manager.submit_answer(user_id=user_id, session_id=manager_session_id, question_id=manager_question_id, answer=answer)
-
-        evaluation = result.get("evaluation")
-        new_manager_question_id = result.get("question_id")
-        next_question = result.get("next_question")
-        next_difficulty = result.get("difficulty")
-
-        db = SessionLocal()
-        try:
-            # update the answered question in DB
-            update_question_result(db=db, question=self._db_get_question_obj(db, question_id), answer=answer, score=float(evaluation.get("score", 0)), feedback=evaluation.get("feedback", ""))
-
-            # persist the newly generated next question
-            db_new_q = create_question(db=db, session_id=session_id, question=next_question, difficulty=int(next_difficulty or 3))
-
-            # map manager <-> db question ids
-            if new_manager_question_id is not None:
-                self._manager_q_to_db_q[new_manager_question_id] = db_new_q.id
-                self._db_q_to_manager_q[db_new_q.id] = new_manager_question_id
-
-        finally:
-            db.close()
-
-        # translate response ids back to DB ids for the client
-        resp = dict(result)
-        resp["question_id"] = db_new_q.id
-        resp["session_id"] = session_id
-        return resp
-
-        def finish_interview(self, user_id: int, session_id: int) -> dict[str, Any]:
+    def finish_interview(self, user_id: int, session_id: int) -> dict[str, Any]:
         """Persist the durable READY_TO_FINISH -> COMPLETED transition.
 
         PostgreSQL is the source of truth. The final score/recommendation are
@@ -952,7 +897,7 @@ class InterviewService:
         finally:
             db.close()
 
-        @staticmethod
+    @staticmethod
     def _compute_final_result(questions: list) -> tuple[float, str, int]:
         """Derive the final score/recommendation from persisted evaluations only.
 
@@ -1010,14 +955,3 @@ class InterviewService:
             "finished_at": session.finished_at,
             "questions_evaluated": len(validated),
         }
-
-    def _db_get_question_obj(self, db, question_id: int):
-        # helper to fetch question ORM object by id
-        from crud import get_question_by_id
-
-        return get_question_by_id(db, question_id)
-
-    def _db_get_session_obj(self, db, session_id: int):
-        from crud import get_session_by_id
-
-        return get_session_by_id(db, session_id)
