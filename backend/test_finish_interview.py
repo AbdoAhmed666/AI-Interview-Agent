@@ -34,9 +34,14 @@ EXPECTED_REC = "Hire"
 
 
 def _service():
-    """A service with an empty (manager-memory-loss) manager -> DB-only proof."""
+    """A service whose manager exposes nothing at all -> DB-only proof.
+
+    The stand-in carries no attributes, so any attempt by ``finish_interview``
+    to read process-local manager workflow state would raise ``AttributeError``
+    instead of silently succeeding.
+    """
     service = InterviewService.__new__(InterviewService)
-    service.manager = SimpleNamespace(_sessions={}, _question_to_session={})
+    service.manager = SimpleNamespace()
     return service
 
 
