@@ -1,9 +1,36 @@
-fastapi
-uvicorn
-streamlit
-pydantic
-requests
-google-genai
-python-dotenv
-reportlab
-pandas
+# AI Interview Agent — backend runtime dependencies.
+# Pinned to versions verified to install and run together.
+
+# --- Web framework / server ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+pydantic==2.13.5
+python-dotenv==1.2.3
+
+# --- Auth / security ---
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+cryptography==50.0.1
+
+# --- Database ---
+SQLAlchemy==2.0.52
+alembic==1.20.0
+psycopg[binary]==3.3.5
+
+# --- LLM providers ---
+google-genai==2.23.0
+groq==1.7.0
+
+# --- RAG / embeddings / documents ---
+sentence-transformers==6.0.1
+faiss-cpu==1.15.0
+numpy==2.4.6
+langchain-text-splitters==1.1.2
+pypdf==6.18.1
+
+# --- Reporting ---
+reportlab==5.0.1
+
+# --- Testing ---
+pytest==9.1.1
