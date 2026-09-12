@@ -41,11 +41,19 @@ class MockLLMProvider(BaseLLMProvider):
         return "What is the difference between Random Forest and XGBoost?"
 
     def evaluate_answer(self, prompt: str) -> str:
-        """Return realistic mock evaluation JSON."""
+        """Return realistic mock evaluation JSON.
+
+        The payload must satisfy ``EvaluationResponse`` (which requires
+        ``level`` and ``concept_gaps`` and forbids extra keys), otherwise the
+        mock/fallback provider path fails validation and no interview can
+        progress without real LLM credentials.
+        """
         return (
-            '{"score": 7, "strengths": ["Clear structure", "Relevant examples"], '
+            '{"score": 7, "level": "medium", '
+            '"strengths": ["Clear structure", "Relevant examples"], '
             '"weaknesses": ["Could be more specific about trade-offs"], '
             '"feedback": "Good answer with room for deeper technical detail.", '
+            '"concept_gaps": ["Scalability trade-offs"], '
             '"follow_up_question": "How would you optimize this approach for large-scale data?"}'
         )
 
