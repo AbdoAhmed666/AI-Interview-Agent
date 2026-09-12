@@ -703,16 +703,36 @@ class InterviewService:
                     if existing is not None:
                         return self._next_question_result(existing)
                     raise GenerationConflict("Generation state changed before persistence")
-                existing = get_question_by_number(db, session_id, next_number)
+                # Recompute the slot from the authoritative, locked state rather
+                # than trusting the value snapshotted before the (slow) LLM call:
+                # if a stale-lease concurrent generation advanced the interview
+                # while we were calling the LLM, the pre-LLM number is stale.
+                persisted_questions = list_questions(db, session_id)
+                persist_number = max(
+                    (
+                        item.question_number
+                        for item in persisted_questions
+                        if item.question_number is not None
+                    ),
+                    default=0,
+                ) + 1
+                existing = get_question_by_number(db, session_id, persist_number)
                 if existing is not None:
                     return self._next_question_result(existing)
+                if persist_number > 5:
+                    # The interview filled up while we were generating; do not
+                    # persist an out-of-range question. A subsequent call
+                    # transitions the session to READY_TO_FINISH.
+                    raise GenerationConflict(
+                        "Interview already has the maximum number of questions"
+                    )
 
                 question = create_question(
                     db,
                     session_id=session_id,
                     question=generated_question,
                     difficulty=current_difficulty,
-                    question_number=next_number,
+                    question_number=persist_number,
                     status=QuestionStatus.ACTIVE,
                 )
                 now = datetime.utcnow()
@@ -725,7 +745,7 @@ class InterviewService:
                         if retry_started
                         else "GENERATION_SUCCEEDED"
                     ),
-                    question_number=next_number,
+                    question_number=persist_number,
                     from_status=SessionStatus.GENERATING,
                     to_status=SessionStatus.IN_PROGRESS,
                     created_at=now,
