@@ -1,9 +1,20 @@
+import pytest
 from pathlib import Path
+
+try:
+    from rag.embeddings import EmbeddingGenerator
+
+    EmbeddingGenerator()
+except Exception as exc:  # pragma: no cover - environment dependent
+    pytest.skip(
+        f"legacy integration script: requires the embedding model "
+        f"(unavailable offline): {exc}",
+        allow_module_level=True,
+    )
 
 from rag.loader import DocumentLoader
 from rag.parser import DocumentParser
 from rag.chunker import TextChunker
-from rag.embeddings import EmbeddingGenerator
 from rag.vector_store import VectorStore
 from rag.retriever import Retriever
 

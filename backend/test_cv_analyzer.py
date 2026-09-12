@@ -1,8 +1,16 @@
+import pytest
+from pathlib import Path
+
+if not Path("uploads/user_1").exists():
+    pytest.skip(
+        "legacy manual script: needs uncommitted local CV fixtures under "
+        "uploads/user_1/. Hermetic coverage lives in test_role_coverage.py.",
+        allow_module_level=True,
+    )
+
 from rag.parser import DocumentParser
 
 from cv.analyzer import CVAnalyzer
-
-from pathlib import Path
 
 parser = DocumentParser()
 

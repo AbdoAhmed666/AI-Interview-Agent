@@ -92,7 +92,7 @@ def finish_interview(request: FinishInterviewRequest, current_user: User = Depen
     if session_obj.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-        service = _get_interview_service()
+    service = _get_interview_service()
     try:
         return service.finish_interview(
             user_id=current_user.id, session_id=request.session_id

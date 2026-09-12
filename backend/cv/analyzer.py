@@ -102,6 +102,23 @@ class CVAnalyzer:
             "javascript",
             "js",
         ],
+        "html": [
+            "html",
+            "html5",
+        ],
+        "css": [
+            "css",
+            "css3",
+        ],
+        "tailwind": [
+            "tailwind",
+            "tailwind css",
+            "tailwindcss",
+        ],
+        "redux": [
+            "redux",
+            "redux toolkit",
+        ],
         "tensorflow": [
             "tensorflow",
         ],
@@ -125,6 +142,9 @@ class CVAnalyzer:
         ],
         "pandas": [
             "pandas",
+        ],
+        "matplotlib": [
+            "matplotlib",
         ],
         "scikit-learn": [
             "scikit-learn",
@@ -161,10 +181,14 @@ class CVAnalyzer:
         # -----------------------------
         # Skills
         # -----------------------------
+        # Match aliases on word boundaries rather than raw substrings so short
+        # tokens do not produce phantom skills (e.g. "git" inside "legitimate",
+        # "ml" inside "html", "ts" inside "results"). Aliases are regex-escaped
+        # so dotted/hyphenated names like "next.js" match literally.
         for skill, aliases in self.SKILL_ALIASES.items():
 
             if any(
-                alias in lower
+                re.search(rf"\b{re.escape(alias)}\b", lower)
                 for alias in aliases
             ):
                 analysis.skills.append(skill)
@@ -188,6 +212,8 @@ class CVAnalyzer:
                 "tensorflow",
                 "pytorch",
                 "sqlalchemy",
+                "tailwind",
+                "redux",
             }
         ]
 

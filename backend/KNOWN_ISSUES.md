@@ -5,24 +5,24 @@ These are real defects discovered during the Finding 3 inspection. They are
 Authority) to keep that change minimal and reviewable. Each should become its
 own task.
 
-## 1. `/finish-interview` route raises `NameError` on the happy path
+## 1. `/finish-interview` route raises `NameError` on the happy path — FIXED
 
 **File:** `api/interview.py` (the `finish_interview` route handler).
 
-**Problem:** `service = _get_interview_service()` is indented **inside** the
+**Problem:** `service = _get_interview_service()` was indented **inside** the
 `if session_obj.user_id != current_user.id:` block. On the normal path (caller
-owns the session) that branch is not entered, so `service` is never bound and
-`return service.finish_interview(...)` raises `NameError`.
+owns the session) that branch is not entered, so `service` was never bound and
+`return service.finish_interview(...)` raised `NameError`.
 
-**Impact:** The finish HTTP endpoint is broken in the running app. It is not
-caught by tests because `test_finish_interview.py` calls
-`InterviewService.finish_interview(...)` directly and bypasses the route.
+**Resolution:** De-indented `service = _get_interview_service()` to the function
+body so it always runs on the happy path. The route now reaches
+`service.finish_interview(...)` normally.
 
-**Fix:** De-indent `service = _get_interview_service()` to the function body
-(one line). This is the same class of indentation bug that the uncommitted
-working-tree diff fixed inside `services/interview_service.py`.
+**Note:** The endpoint is still only exercised indirectly by tests
+(`test_finish_interview.py` calls `InterviewService.finish_interview(...)`
+directly). A route-level HTTP test would be a good follow-up.
 
-## 2. `test_next_question_generation.py` teardown FK violation
+## 2. `test_next_question_generation.py` teardown FK violation — FIXED
 
 **File:** `test_next_question_generation.py` — `_clear_test_rows`.
 
@@ -37,6 +37,8 @@ questions raises `ForeignKeyViolation`.
 **Note:** The handoff attributed this to `crud.delete_questions_after`. That
 function does not exist; the failing deletion is inline in the test teardown.
 
-**Fix options (pick in its own task):** delete referencing audit rows first in
-teardown, or add `ON DELETE CASCADE`/`SET NULL` to the
-`interview_audit_log.question_id` FK via an Alembic migration.
+**Resolution:** Added `ON DELETE CASCADE` to both `interview_audit_log`
+foreign keys (`session_id` and `question_id`) via migration
+`d2f5a1b9c3e7`, and updated `models.py` to match. Deleting a session or
+question now removes its audit rows instead of raising, which also makes
+test teardown integrity-safe.

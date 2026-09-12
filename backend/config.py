@@ -45,4 +45,55 @@ class Settings:
     # Database
     database_url: str = os.getenv("DATABASE_URL", "")
 
+    # Deployment / runtime
+    app_env: str = os.getenv("APP_ENV", "development").strip().lower()
+
+    debug: bool = os.getenv("DEBUG", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+    # Comma-separated list of allowed CORS origins for the frontend.
+    cors_allow_origins: str = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env in ("production", "prod")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parsed, de-duplicated list of allowed CORS origins."""
+        return [
+            origin.strip()
+            for origin in self.cors_allow_origins.split(",")
+            if origin.strip()
+        ]
+
+    def validate_runtime(self) -> None:
+        """Fail fast on misconfiguration that would be unsafe at runtime.
+
+        Called once at application startup so a misconfigured deployment
+        refuses to boot instead of silently signing tokens with an empty
+        secret or connecting to no database.
+        """
+        errors: list[str] = []
+        if not self.secret_key:
+            errors.append("SECRET_KEY is not set (JWTs would be unsigned/forgeable).")
+        elif self.is_production and len(self.secret_key) < 32:
+            errors.append("SECRET_KEY is too short for production (use >= 32 chars).")
+        if not self.database_url:
+            errors.append("DATABASE_URL is not set.")
+        if self.is_production and self.debug:
+            errors.append("DEBUG must be disabled in production.")
+        if errors:
+            raise RuntimeError(
+                "Invalid configuration:\n  - " + "\n  - ".join(errors)
+            )
+
+
 settings = Settings()

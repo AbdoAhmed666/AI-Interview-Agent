@@ -5,6 +5,7 @@ This file contains the API routes only.
 
 import os
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends
 import logging
@@ -28,17 +29,21 @@ from llm_provider import GeminiProvider, get_provider
 from schemas import EvaluationRequest, EvaluationResponse, InterviewRequest, InterviewResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
 from services.interview_service import InterviewService
 
-app = FastAPI(title="AI Interview Agent API")
 
-# Configure CORS for the frontend origin(s)
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Refuse to boot on unsafe configuration (empty JWT secret, no DB, etc.).
+    settings.validate_runtime()
+    yield
 
+
+app = FastAPI(title="AI Interview Agent API", lifespan=lifespan)
+
+# Configure CORS for the frontend origin(s). Origins are environment-driven
+# (CORS_ALLOW_ORIGINS) so a deployed frontend can be allowed without code edits.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -54,8 +59,14 @@ interview_service = InterviewService()
 
 @app.get("/")
 def read_root() -> dict[str, str]:
-    """Simple health-check endpoint for the backend."""
+    """Simple root endpoint for the backend."""
     return {"message": "AI Interview Agent backend is running."}
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Liveness probe for load balancers / orchestrators."""
+    return {"status": "ok"}
 
 
 @app.post("/start-interview")
@@ -79,7 +90,9 @@ def start_interview(
 
 
 @app.post("/evaluate-answer", response_model=EvaluationResponse)
-def evaluate_answer_endpoint(request: EvaluationRequest) -> EvaluationResponse:
+def evaluate_answer_endpoint(
+    request: EvaluationRequest, current_user=Depends(get_current_user)
+) -> EvaluationResponse:
     """Evaluate a candidate answer and validate the returned JSON structure."""
     try:
         return evaluate_answer(request.role, request.question, request.answer)
@@ -88,7 +101,9 @@ def evaluate_answer_endpoint(request: EvaluationRequest) -> EvaluationResponse:
 
 
 @app.post("/summarize-session", response_model=SessionSummaryResponse)
-def summarize_session_endpoint(request: SessionSummaryRequest) -> SessionSummaryResponse:
+def summarize_session_endpoint(
+    request: SessionSummaryRequest, current_user=Depends(get_current_user)
+) -> SessionSummaryResponse:
     """Generate a final summary for a complete interview session."""
     try:
         return summarize_session(request)
@@ -101,7 +116,9 @@ def summarize_session_endpoint(request: SessionSummaryRequest) -> SessionSummary
     response_class=StreamingResponse,
     responses={200: {"content": {"application/pdf": {}}, "description": "PDF download"}},
 )
-def download_report(request: ReportRequest) -> StreamingResponse:
+def download_report(
+    request: ReportRequest, current_user=Depends(get_current_user)
+) -> StreamingResponse:
     """Generate and return an interview report PDF in memory."""
     pdf_bytes = build_report_pdf(request)
     return StreamingResponse(
@@ -114,7 +131,15 @@ def download_report(request: ReportRequest) -> StreamingResponse:
     )
 
 
-@app.get("/debug/provider")
+# Debug endpoints expose internal state (provider config, sys.path, cwd) and can
+# call the live LLM. They are mounted only when DEBUG is enabled, so they are
+# never reachable — or even advertised in /docs — in a production deployment.
+from fastapi import APIRouter
+
+debug_router = APIRouter(prefix="/debug", tags=["Debug"])
+
+
+@debug_router.get("/provider")
 def debug_provider() -> dict[str, object]:
     """Return provider selection metadata for debugging purposes."""
     return {
@@ -124,7 +149,7 @@ def debug_provider() -> dict[str, object]:
     }
 
 
-@app.get("/debug/gemini")
+@debug_router.get("/gemini")
 def debug_gemini() -> dict[str, object]:
     """Temporarily test Gemini provider behavior and capture errors."""
     try:
@@ -144,7 +169,7 @@ def debug_gemini() -> dict[str, object]:
         }
 
 
-@app.get("/debug/imports")
+@debug_router.get("/imports")
 def debug_imports() -> dict[str, object]:
     """Inspect Python import resolution inside the FastAPI process."""
     import_result = {"sys_executable": sys.executable, "sys_path": sys.path, "cwd": os.getcwd()}
@@ -170,3 +195,8 @@ def debug_imports() -> dict[str, object]:
         import_result["genai_import_error_message"] = str(exc)
 
     return import_result
+
+
+# Only expose debug routes when explicitly enabled (never in production).
+if settings.debug:
+    app.include_router(debug_router)

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from config import settings
 from typing import Any
@@ -17,34 +17,42 @@ from database import get_db
 
 from models import User
 
-# Password hashing
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-)
-
 # JWT Configuration
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+
+# bcrypt only considers the first 72 bytes of a password; bcrypt >= 4.1 raises
+# instead of silently truncating, so we truncate explicitly for consistent,
+# version-independent behavior. We use the ``bcrypt`` library directly rather
+# than passlib, which is unmaintained and breaks against modern bcrypt.
+_BCRYPT_MAX_BYTES = 72
 
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="token",
 )
 
+
+def _password_bytes(password: str) -> bytes:
+    return password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+
+
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(
     plain_password: str,
     hashed_password: str,
 ) -> bool:
-    return pwd_context.verify(
-        plain_password,
-        hashed_password,
-    )
+    try:
+        return bcrypt.checkpw(
+            _password_bytes(plain_password),
+            hashed_password.encode("utf-8"),
+        )
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(

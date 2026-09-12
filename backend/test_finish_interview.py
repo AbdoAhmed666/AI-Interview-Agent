@@ -27,6 +27,8 @@ from services.interview_service import (
     InterviewService,
 )
 
+pytestmark = pytest.mark.usefixtures("seeded_workflow")
+
 USER_ID = 9
 SCORES = [8, 8, 8, 8, 8]
 EXPECTED_SCORE = 8.0
