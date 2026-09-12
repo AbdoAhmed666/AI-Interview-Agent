@@ -225,13 +225,13 @@ class InterviewAuditLog(Base):
 
     session_id = Column(
         Integer,
-        ForeignKey("interview_sessions.id"),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     question_id = Column(
         Integer,
-        ForeignKey("interview_questions.id"),
+        ForeignKey("interview_questions.id", ondelete="CASCADE"),
         nullable=True,
     )
 
