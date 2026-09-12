@@ -9,6 +9,7 @@ except ImportError:  # pragma: no cover - fallback for direct execution
     from interview.interview_manager import InterviewManager
 
 from database import SessionLocal
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from repositories.interview_repository import (
     create_audit_event,
@@ -754,6 +755,21 @@ class InterviewService:
                     db, session, status=SessionStatus.IN_PROGRESS, updated_at=now
                 )
                 return self._next_question_result(question)
+        except IntegrityError:
+            # A concurrent generation won the race to persist the next
+            # question (same number, or the single-active-question index).
+            # Return that already-persisted active question instead of
+            # surfacing a 500; if none is visible, report a retryable conflict.
+            recovery_db = SessionLocal()
+            try:
+                active = get_current_question(recovery_db, session_id)
+            finally:
+                recovery_db.close()
+            if active is not None:
+                return self._next_question_result(active)
+            raise GenerationConflict(
+                "Concurrent question generation conflict"
+            )
         finally:
             db.close()
 
