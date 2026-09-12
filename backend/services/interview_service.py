@@ -331,7 +331,10 @@ class InterviewService:
         db = SessionLocal()
         try:
             session = get_session(db, session_id)
-            if session is None:
+            # Enforce ownership before any fast-path return (e.g. the already
+            # EVALUATED result below), so a non-owner can never read another
+            # user's evaluation. A non-owner is treated as "not found".
+            if session is None or session.user_id != user_id:
                 raise AnswerClaimNotFound("Interview session not found")
             question = get_question_for_session(db, session_id, question_id)
             if question is None:

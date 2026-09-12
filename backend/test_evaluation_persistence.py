@@ -11,6 +11,7 @@ from models import InterviewAuditLog, InterviewQuestion
 from schemas import EvaluationLevel, EvaluationResponse, QuestionStatus
 from services.interview_service import (
     AnswerClaimConflict,
+    AnswerClaimNotFound,
     InterviewService,
 )
 import services.interview_service as interview_service_module
@@ -218,6 +219,25 @@ def test_ownership_rejection_does_not_call_llm(monkeypatch):
         _service_without_manager().evaluate_claimed_answer(
             10, SESSION_ID, QUESTION_ID
         )
+
+
+def test_ownership_rejected_on_already_evaluated_fast_path(monkeypatch):
+    # A non-owner must not be able to read another user's evaluation via the
+    # already-EVALUATED fast path.
+    existing = _evaluation().model_dump(mode="json")
+    _prepare_question(QuestionStatus.EVALUATED.value, evaluation=existing)
+    monkeypatch.setattr(
+        interview_service_module,
+        "evaluate_answer_with_llm",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("LLM must not be called")),
+    )
+    try:
+        with pytest.raises(AnswerClaimNotFound):
+            _service_without_manager().evaluate_claimed_answer(
+                10, SESSION_ID, QUESTION_ID
+            )
+    finally:
+        _restore_question()
 
 
 def test_evaluation_schema_rejects_invalid_payloads():
