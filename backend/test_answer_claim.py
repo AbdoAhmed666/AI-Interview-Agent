@@ -17,6 +17,8 @@ from services.interview_service import (
 )
 import services.interview_service as interview_service_module
 
+pytestmark = pytest.mark.usefixtures("seeded_workflow")
+
 
 def _service_without_manager():
     return InterviewService.__new__(InterviewService)

@@ -15,6 +15,8 @@ from schemas import QuestionStatus, SessionStatus
 import services.interview_service as interview_service_module
 from services.interview_service import InterviewService
 
+pytestmark = pytest.mark.usefixtures("seeded_workflow")
+
 QUESTION_TEXT = "Why is CI/CD important for backend engineers?"
 
 
@@ -54,9 +56,9 @@ def _fake_manager(first_question=QUESTION_TEXT, eligible=True):
         ),
         query_builder=SimpleNamespace(build=lambda analysis, role, difficulty: "query"),
         rag=SimpleNamespace(
-            ensure_cv_index=lambda user_id, cv_path: None,
-            ensure_knowledge_index=lambda role: None,
-            retrieve_hybrid=lambda query: chunks,
+            ensure_cv_store=lambda user_id, cv_path: None,
+            ensure_knowledge_store=lambda role: None,
+            retrieve_hybrid_isolated=lambda query, cv_store, knowledge_store: chunks,
         ),
         prompt_builder=SimpleNamespace(
             build_question_prompt=lambda role, difficulty, cv_chunks, knowledge_chunks: "prompt"

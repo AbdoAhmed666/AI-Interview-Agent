@@ -1,4 +1,12 @@
+import pytest
 from pathlib import Path
+
+if not Path("uploads/user_1").exists():
+    pytest.skip(
+        "legacy manual script: hardcodes a local (Windows) CV path and needs "
+        "uncommitted fixtures under uploads/user_1/.",
+        allow_module_level=True,
+    )
 
 from cv.storage import CVStorage
 

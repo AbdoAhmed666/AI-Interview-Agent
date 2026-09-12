@@ -1,4 +1,21 @@
+import pytest
 from pathlib import Path
+
+if not Path("uploads/user_1").exists():
+    pytest.skip(
+        "legacy integration script: needs uncommitted local CV fixtures under "
+        "uploads/user_1/.",
+        allow_module_level=True,
+    )
+try:
+    from rag.embeddings import EmbeddingGenerator
+
+    EmbeddingGenerator()
+except Exception as exc:  # pragma: no cover - environment dependent
+    pytest.skip(
+        f"requires the embedding model (unavailable offline): {exc}",
+        allow_module_level=True,
+    )
 
 from rag.rag_service import RAGService
 

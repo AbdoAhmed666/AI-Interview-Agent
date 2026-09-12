@@ -2,6 +2,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from database import SessionLocal
@@ -20,6 +22,8 @@ from repositories.interview_repository import (
     update_session_state,
 )
 from schemas import QuestionStatus, SessionStatus
+
+pytestmark = pytest.mark.usefixtures("seeded_workflow")
 
 
 def test_get_session_and_current_question():

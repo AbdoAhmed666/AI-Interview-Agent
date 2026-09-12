@@ -15,6 +15,8 @@ from services.interview_service import (
 )
 import services.interview_service as interview_service_module
 
+pytestmark = pytest.mark.usefixtures("seeded_workflow")
+
 
 QUESTION_ID = 44
 SESSION_ID = 23
