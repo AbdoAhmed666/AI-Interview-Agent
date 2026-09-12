@@ -49,12 +49,9 @@ def evaluate_answer(role: str, question: str, answer: str) -> EvaluationResponse
     prompt = build_evaluation_prompt(role=role, question=question, answer=answer, difficulty="medium")
     raw_response = get_provider().evaluate_answer(prompt)
 
-    if logger.handlers:
-        logger.info("RAW_EVALUATION_RESPONSE=%s", raw_response)
-    else:
-        print("RAW_EVALUATION_RESPONSE_START")
-        print(raw_response)
-        print("RAW_EVALUATION_RESPONSE_END")
+    # Raw model output can contain candidate answer content, so log it only at
+    # DEBUG and never write it to stdout.
+    logger.debug("Raw evaluation response: %s", raw_response)
 
     try:
         json_text = _extract_json_payload(raw_response)
@@ -74,12 +71,9 @@ def summarize_session(session: SessionSummaryRequest) -> SessionSummaryResponse:
     )
     raw_response = get_provider().summarize_session(prompt)
 
-    if logger.handlers:
-        logger.info("RAW_SESSION_SUMMARY_RESPONSE=%s", raw_response)
-    else:
-        print("RAW_SESSION_SUMMARY_RESPONSE_START")
-        print(raw_response)
-        print("RAW_SESSION_SUMMARY_RESPONSE_END")
+    # Raw model output can contain candidate content, so log it only at DEBUG
+    # and never write it to stdout.
+    logger.debug("Raw session summary response: %s", raw_response)
 
     try:
         json_text = _extract_json_payload(raw_response)
