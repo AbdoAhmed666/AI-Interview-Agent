@@ -537,10 +537,15 @@ class InterviewService:
                 update_session_state(
                     db, session, status=SessionStatus.IN_PROGRESS, updated_at=now
                 )
+                # Refresh the staleness lease so a concurrent worker sees this
+                # retry as in-progress and backs off. Without this, the lease
+                # kept the original (already-stale) answer_submitted_at, so a
+                # second worker would immediately re-claim the same retry.
                 update_question(
                     db,
                     question,
                     status=QuestionStatus.EVALUATING,
+                    answer_submitted_at=now,
                 )
                 create_audit_event(
                     db,
