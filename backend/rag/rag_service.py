@@ -6,6 +6,7 @@ low-level implementation details to the rest of the application.
 """
 
 import importlib.util
+import threading
 from pathlib import Path
 
 
@@ -30,6 +31,25 @@ VectorStore = _load_module("backend_rag_vector_store", rag_dir / "vector_store.p
 rag_config = _load_module("backend_rag_config", rag_dir / "config.py")
 KNOWLEDGE_BASE_DIR = rag_config.KNOWLEDGE_BASE_DIR
 KNOWLEDGE_INDEX_DIR = rag_config.KNOWLEDGE_INDEX_DIR
+INDEX_FILE_NAME = rag_config.INDEX_FILE_NAME
+
+
+# Per-directory locks serialize index build/load on the same on-disk location
+# (a user's CV dir, or a role's knowledge dir) so two concurrent requests never
+# write the same faiss.index/metadata.json at once or read a half-written index.
+# Different users/roles use different directories and proceed in parallel.
+_DIR_LOCKS: dict[str, threading.Lock] = {}
+_DIR_LOCKS_GUARD = threading.Lock()
+
+
+def _directory_lock(directory: Path) -> threading.Lock:
+    key = str(Path(directory).resolve())
+    with _DIR_LOCKS_GUARD:
+        lock = _DIR_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _DIR_LOCKS[key] = lock
+        return lock
 
 class RAGService:
     """High-level interface for RAG operations."""
@@ -269,3 +289,62 @@ class RAGService:
         self.knowledge_store.load(
             index_directory
         )
+
+    # ------------------------------------------------------------------
+    # Isolated (per-request) retrieval
+    #
+    # The methods above keep index state on ``self.knowledge_store`` /
+    # ``self.cv_store``. Because a single ``RAGService`` instance is shared
+    # process-wide, reading that mutable state on a concurrent request path
+    # can leak one user's CV into another user's interview. The methods below
+    # never touch shared store state: they return fresh, call-local
+    # ``VectorStore`` instances, so concurrent callers are fully isolated.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_store(directory: Path) -> "VectorStore":
+        """Return a fresh VectorStore loaded from ``directory`` (empty if none)."""
+        store = VectorStore()
+        store.load(directory)
+        return store
+
+    def ensure_cv_store(self, user_id: int, cv_path: Path) -> "VectorStore":
+        """Build the user's CV index if missing and return an isolated store.
+
+        The build+load critical section is serialized per user directory so
+        concurrent requests never corrupt or half-read the same index files.
+        """
+        user_directory = cv_path.parent
+        index_path = user_directory / INDEX_FILE_NAME
+        with _directory_lock(user_directory):
+            if not index_path.exists():
+                self.build_user_cv_index(user_id=user_id, cv_path=cv_path)
+            return self._load_store(user_directory)
+
+    def ensure_knowledge_store(self, role: str) -> "VectorStore":
+        """Build the role knowledge index if missing and return an isolated store."""
+        index_directory = KNOWLEDGE_INDEX_DIR / role
+        index_file = index_directory / INDEX_FILE_NAME
+        with _directory_lock(index_directory):
+            if index_file.exists():
+                try:
+                    return self._load_store(index_directory)
+                except Exception:
+                    pass
+            self.build_knowledge_base_index(role, index_directory)
+            return self._load_store(index_directory)
+
+    def retrieve_hybrid_isolated(
+        self,
+        query: str,
+        cv_store: "VectorStore",
+        knowledge_store: "VectorStore",
+        top_k: int = 4,
+    ):
+        """Retrieve from caller-provided stores only (no shared state)."""
+        embedding = self.embedder.encode_query(query)
+        knowledge_results = Retriever(knowledge_store).retrieve(embedding, top_k)
+        cv_results = Retriever(cv_store).retrieve(embedding, top_k)
+        results = knowledge_results + cv_results
+        results.sort(key=lambda item: item.score, reverse=True)
+        return results

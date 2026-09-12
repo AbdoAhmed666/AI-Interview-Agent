@@ -777,9 +777,13 @@ class InterviewService:
         analysis = self.manager.analyzer.analyze(document.content)
         difficulty_label = self._difficulty_label(difficulty)
         query = self.manager.query_builder.build(analysis, role, difficulty_label)
-        self.manager.rag.ensure_cv_index(user_id, cv_path)
-        self.manager.rag.ensure_knowledge_index(role)
-        results = self.manager.rag.retrieve_hybrid(query)
+        # Use isolated, per-request stores so a concurrent interview for another
+        # user can never overwrite this user's CV/knowledge context mid-request.
+        cv_store = self.manager.rag.ensure_cv_store(user_id, cv_path)
+        knowledge_store = self.manager.rag.ensure_knowledge_store(role)
+        results = self.manager.rag.retrieve_hybrid_isolated(
+            query, cv_store=cv_store, knowledge_store=knowledge_store
+        )
         prompt = self.manager.prompt_builder.build_question_prompt(
             role=role,
             difficulty=difficulty_label,
