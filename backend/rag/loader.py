@@ -35,14 +35,24 @@ class DocumentLoader:
         self.knowledge_base_dir = knowledge_base_dir
 
     def load_role_documents(self, role: str) -> list[Path]:
-        """Return all supported documents for a given role."""
+        """Return all supported documents for a given role.
+
+        A role without a knowledge-base directory is not an error: the CV and
+        the LLM's own knowledge still drive the interview. We log and return an
+        empty list so question generation degrades gracefully (an empty
+        knowledge index) instead of raising and returning a 500 to the user.
+        """
 
         role_dir = self.knowledge_base_dir / role
 
         if not role_dir.exists():
-            raise FileNotFoundError(
-                f"Knowledge base directory not found: {role_dir}"
+            logger.warning(
+                "No knowledge base directory for role '%s' (%s); "
+                "continuing with an empty knowledge index.",
+                role,
+                role_dir,
             )
+            return []
 
         documents: list[Path] = []
 
