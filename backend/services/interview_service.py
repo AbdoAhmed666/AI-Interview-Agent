@@ -294,7 +294,7 @@ class InterviewService:
             db,
             question,
             status=QuestionStatus.EVALUATING,
-            answer=answer,
+            answer=InterviewService._normalize_answer(answer),
             answer_submitted_at=submitted_at,
             evaluation=None,
             evaluated_at=None,
@@ -505,8 +505,20 @@ class InterviewService:
         )
 
     @staticmethod
+    def _normalize_answer(answer: str | None) -> str:
+        """Canonical form of a candidate answer used for storage and comparison.
+
+        Trims surrounding whitespace so the persisted answer and the duplicate
+        check agree; internal content is left untouched.
+        """
+        return (answer or "").strip()
+
+    @staticmethod
     def _answers_equal(first: str | None, second: str | None) -> bool:
-        return (first or "").strip() == (second or "").strip()
+        return (
+            InterviewService._normalize_answer(first)
+            == InterviewService._normalize_answer(second)
+        )
 
     def _claim_evaluation_retry(
         self,

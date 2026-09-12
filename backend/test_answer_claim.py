@@ -71,6 +71,26 @@ def test_active_question_claim_is_durable_with_atomic_audit_then_rolls_back_test
         verification_db.close()
 
 
+def test_claim_persists_normalized_answer():
+    db = SessionLocal()
+    try:
+        result = _service_without_manager()._claim_answer_in_transaction(
+            db=db,
+            user_id=9,
+            session_id=23,
+            question_id=44,
+            answer="   my padded answer  \n",
+        )
+        question = db.get(InterviewQuestion, 44)
+        assert result["status"] == QuestionStatus.EVALUATING.value
+        # The stored answer is normalized (trimmed), matching the form used by
+        # the duplicate-submission check.
+        assert question.answer == "my padded answer"
+    finally:
+        db.rollback()
+        db.close()
+
+
 def test_claim_rejects_already_submitted_question_without_overwrite():
     db = SessionLocal()
     try:
