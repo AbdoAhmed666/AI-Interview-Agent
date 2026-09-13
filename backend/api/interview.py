@@ -28,6 +28,19 @@ def _get_interview_service() -> InterviewService:
     return interview_service
 
 
+def _with_evaluation(result: dict, evaluation) -> dict:
+    """Surface the just-computed evaluation alongside the next question.
+
+    ``generate_next_question`` returns the next question with ``evaluation:
+    None``; the evaluation of the answer just submitted is produced separately.
+    Merge it in so the client can show per-answer feedback without dropping the
+    next question.
+    """
+    if evaluation is not None and result.get("evaluation") is None:
+        return {**result, "evaluation": evaluation}
+    return result
+
+
 class FinishInterviewRequest(BaseModel):
     session_id: int
 
@@ -55,11 +68,12 @@ def adaptive_interview(request: EvaluationRequest, current_user: User = Depends(
         )
         if claim_result.get("already_submitted"):
             if claim_result.get("status") == "EVALUATED":
-                return service.generate_next_question(
+                next_result = service.generate_next_question(
                     user_id=current_user.id,
                     session_id=request.session_id,
                     question_id=request.question_id,
                 )
+                return _with_evaluation(next_result, claim_result.get("evaluation"))
             return claim_result
         evaluation_result = service.evaluate_claimed_answer(
             user_id=current_user.id,
@@ -67,11 +81,12 @@ def adaptive_interview(request: EvaluationRequest, current_user: User = Depends(
             question_id=request.question_id,
         )
         if evaluation_result.get("status") == "EVALUATED":
-            return service.generate_next_question(
+            next_result = service.generate_next_question(
                 user_id=current_user.id,
                 session_id=request.session_id,
                 question_id=request.question_id,
             )
+            return _with_evaluation(next_result, evaluation_result.get("evaluation"))
         return evaluation_result
     except AnswerClaimNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

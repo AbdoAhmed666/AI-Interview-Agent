@@ -86,6 +86,10 @@ export default function useInterview() {
 
       setAnswer("");
 
+      // Show the AI's feedback on the answer just submitted (returned for
+      // every question, including the last).
+      setEvaluation(data.evaluation ?? null);
+
       // The backend ends the interview by returning READY_TO_FINISH (there is
       // no sixth question); the answered-count is a defensive fallback.
       const isFinished =
@@ -102,7 +106,6 @@ export default function useInterview() {
         return;
       }
 
-      setEvaluation(data.evaluation ?? null);
       setDifficulty(data.difficulty ?? difficulty);
       setQuestion(data.next_question);
       setQuestionId(data.question_id);
