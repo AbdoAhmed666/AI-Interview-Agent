@@ -7,6 +7,7 @@ import {
   evaluateAnswer,
   finishInterview,
 } from "@/services/interview.service";
+import { getApiErrorMessage } from "@/lib/apiError";
 
 export default function useInterview() {
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -35,10 +36,13 @@ export default function useInterview() {
 
   const [recommendation, setRecommendation] = useState("");
 
+  const [error, setError] = useState("");
+
   //--------------------------------
 
   async function start(roleName: string) {
     setLoading(true);
+    setError("");
 
     try {
       const data = await startInterview(roleName);
@@ -75,42 +79,36 @@ export default function useInterview() {
     if (!questionId || !sessionId) return;
 
     setLoading(true);
+    setError("");
 
     try {
-      const data = await evaluateAnswer(
-        sessionId,
-        questionId,
-        answer
-      );
-
-      setEvaluation(data.evaluation);
-
-      setDifficulty(data.difficulty);
+      const data = await evaluateAnswer(sessionId, questionId, answer);
 
       setAnswer("");
 
-      if (questionNumber >= totalQuestions) {
-        const result = await finishInterview(
-          sessionId
-        );
+      // The backend ends the interview by returning READY_TO_FINISH (there is
+      // no sixth question); the answered-count is a defensive fallback.
+      const isFinished =
+        data?.status === "READY_TO_FINISH" ||
+        questionNumber >= totalQuestions;
 
-        setFinished(true);
+      if (isFinished) {
+        const result = await finishInterview(sessionId);
 
-        window.location.href="/history";
-
-        // backend returns `final_score`; map it into frontend `overallScore`
-        setOverallScore(result.final_score);
-
+        // Backend returns overall_score / recommendation.
+        setOverallScore(result.overall_score);
         setRecommendation(result.recommendation);
-
+        setFinished(true);
         return;
       }
 
+      setEvaluation(data.evaluation ?? null);
+      setDifficulty(data.difficulty ?? difficulty);
       setQuestion(data.next_question);
-
       setQuestionId(data.question_id);
-
       setQuestionNumber((q) => q + 1);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -136,6 +134,12 @@ export default function useInterview() {
     setDifficulty(3);
 
     setFinished(false);
+
+    setOverallScore(undefined);
+
+    setRecommendation("");
+
+    setError("");
   }
 
   return {
@@ -164,6 +168,8 @@ export default function useInterview() {
     overallScore,
 
     recommendation,
+
+    error,
 
     start,
 

@@ -11,7 +11,11 @@ export default function AnswerEditor() {
         submit,
         loading,
         question,
+        finished,
+        error,
     } = useInterview();
+
+    const disabled = !question || finished;
 
     return (
 
@@ -24,18 +28,24 @@ export default function AnswerEditor() {
             <textarea
                 rows={8}
                 value={answer}
-                disabled={!question}
+                disabled={disabled}
                 onChange={(e)=>setAnswer(e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 resize-none"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 resize-none disabled:opacity-50"
             />
 
             <Button
                 className="mt-5"
                 onClick={submit}
-                disabled={loading || !question}
+                disabled={loading || disabled || !answer.trim()}
             >
                 {loading ? "Submitting..." : "Submit Answer"}
             </Button>
+
+            {error && (
+                <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {error}
+                </p>
+            )}
 
         </div>
 

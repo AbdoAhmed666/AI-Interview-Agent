@@ -9,6 +9,7 @@
   import QuestionCard from "@/components/interview/QuestionCard";
   import AnswerEditor from "@/components/interview/AnswerEditor";
   import EvaluationPanel from "@/components/interview/EvaluationPanel";
+  import ResultPanel from "@/components/interview/ResultPanel";
   import InterviewToolbar from "@/components/interview/InterviewToolbar";
   import ProgressBar from "@/components/interview/ProgressBar";
 
@@ -29,6 +30,8 @@
           <InterviewToolbar />
 
           <ProgressBar />
+
+          <ResultPanel />
 
           <RoleSelector />
 
