@@ -135,6 +135,96 @@ def test_successful_generation_persists_next_question(monkeypatch):
         _restore_session()
 
 
+def test_generation_recomputes_question_number_in_final_transaction(monkeypatch):
+    # Pre-LLM the next number is 4. Simulate a stale-lease concurrent generation
+    # that lands an (already evaluated) question 4 while we are calling the LLM,
+    # so the pre-LLM number is now stale.
+    _prepare_evaluated_question()
+
+    def generate_and_advance(user_id, role, difficulty):
+        db = SessionLocal()
+        try:
+            with db.begin():
+                create_question(
+                    db,
+                    session_id=SESSION_ID,
+                    question="concurrent question 4",
+                    difficulty=3,
+                    question_number=4,
+                    status=QuestionStatus.EVALUATED,
+                )
+        finally:
+            db.close()
+        return "Recomputed next question"
+
+    service = _service_without_manager()
+    monkeypatch.setattr(service, "_generate_question_text", generate_and_advance)
+    try:
+        result = service.generate_next_question(
+            USER_ID, SESSION_ID, EVALUATED_QUESTION_ID
+        )
+        # The final transaction recomputes the slot from the current state, so
+        # the generated question is persisted as #5, not a duplicate #4.
+        assert result["question_number"] == 5
+        db = SessionLocal()
+        try:
+            question = db.query(InterviewQuestion).filter_by(
+                session_id=SESSION_ID, question_number=5
+            ).one()
+            assert question.question == "Recomputed next question"
+            assert question.status == QuestionStatus.ACTIVE.value
+        finally:
+            db.close()
+    finally:
+        _restore_session()
+
+
+def test_concurrent_generation_integrity_error_returns_existing_active(monkeypatch):
+    # A concurrent generation lands an ACTIVE question 4 (occupying the single
+    # active slot) while we call the LLM. Persisting our question then violates
+    # the one-active-question unique index.
+    _prepare_evaluated_question()
+
+    def generate_and_add_active(user_id, role, difficulty):
+        db = SessionLocal()
+        try:
+            with db.begin():
+                create_question(
+                    db,
+                    session_id=SESSION_ID,
+                    question="concurrent active question",
+                    difficulty=3,
+                    question_number=4,
+                    status=QuestionStatus.ACTIVE,
+                )
+        finally:
+            db.close()
+        return "loser question text"
+
+    service = _service_without_manager()
+    monkeypatch.setattr(service, "_generate_question_text", generate_and_add_active)
+    try:
+        result = service.generate_next_question(
+            USER_ID, SESSION_ID, EVALUATED_QUESTION_ID
+        )
+        # The IntegrityError is handled gracefully: we return the already
+        # persisted active question instead of surfacing a 500.
+        assert result["question_number"] == 4
+        assert result["next_question"] == "concurrent active question"
+        db = SessionLocal()
+        try:
+            assert (
+                db.query(InterviewQuestion)
+                .filter_by(session_id=SESSION_ID, question_number=5)
+                .count()
+                == 0
+            )
+        finally:
+            db.close()
+    finally:
+        _restore_session()
+
+
 def test_generation_failure_preserves_evaluation_and_marks_session(monkeypatch):
     _prepare_evaluated_question()
     service = _service_without_manager()

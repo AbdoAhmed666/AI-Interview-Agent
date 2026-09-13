@@ -11,6 +11,7 @@ from models import InterviewAuditLog, InterviewQuestion
 from schemas import EvaluationLevel, EvaluationResponse, QuestionStatus
 from services.interview_service import (
     AnswerClaimConflict,
+    AnswerClaimNotFound,
     InterviewService,
 )
 import services.interview_service as interview_service_module
@@ -220,6 +221,25 @@ def test_ownership_rejection_does_not_call_llm(monkeypatch):
         )
 
 
+def test_ownership_rejected_on_already_evaluated_fast_path(monkeypatch):
+    # A non-owner must not be able to read another user's evaluation via the
+    # already-EVALUATED fast path.
+    existing = _evaluation().model_dump(mode="json")
+    _prepare_question(QuestionStatus.EVALUATED.value, evaluation=existing)
+    monkeypatch.setattr(
+        interview_service_module,
+        "evaluate_answer_with_llm",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("LLM must not be called")),
+    )
+    try:
+        with pytest.raises(AnswerClaimNotFound):
+            _service_without_manager().evaluate_claimed_answer(
+                10, SESSION_ID, QUESTION_ID
+            )
+    finally:
+        _restore_question()
+
+
 def test_evaluation_schema_rejects_invalid_payloads():
     with pytest.raises(ValueError):
         EvaluationResponse.model_validate({
@@ -254,6 +274,37 @@ def test_evaluation_schema_rejects_invalid_payloads():
             "follow_up_question": "next",
             "extra": True,
         })
+
+
+def test_stale_evaluating_retry_refreshes_the_staleness_lease():
+    # _prepare_question sets answer_submitted_at ~10 minutes in the past, which
+    # is stale relative to interview_recovery_stale_seconds (300s default).
+    _prepare_question(QuestionStatus.EVALUATING.value)
+    try:
+        started = _service_without_manager()._claim_evaluation_retry(
+            USER_ID, SESSION_ID, QUESTION_ID
+        )
+        assert started is True
+        db = SessionLocal()
+        try:
+            question = db.get(InterviewQuestion, QUESTION_ID)
+            assert question.status == QuestionStatus.EVALUATING.value
+            # The lease timestamp is refreshed, so the retry is no longer stale
+            # and a concurrent worker would see it as in progress and back off.
+            assert question.answer_submitted_at is not None
+            assert not InterviewService._is_stale(question.answer_submitted_at)
+            assert (
+                db.query(InterviewAuditLog)
+                .filter_by(
+                    session_id=SESSION_ID, event_type="EVALUATION_RETRY_STARTED"
+                )
+                .count()
+                == 1
+            )
+        finally:
+            db.close()
+    finally:
+        _restore_question()
 
 
 def test_evaluation_retry_succeeds_from_failed_state(monkeypatch):

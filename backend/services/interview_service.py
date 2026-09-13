@@ -9,6 +9,7 @@ except ImportError:  # pragma: no cover - fallback for direct execution
     from interview.interview_manager import InterviewManager
 
 from database import SessionLocal
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from repositories.interview_repository import (
     create_audit_event,
@@ -293,7 +294,7 @@ class InterviewService:
             db,
             question,
             status=QuestionStatus.EVALUATING,
-            answer=answer,
+            answer=InterviewService._normalize_answer(answer),
             answer_submitted_at=submitted_at,
             evaluation=None,
             evaluated_at=None,
@@ -331,7 +332,10 @@ class InterviewService:
         db = SessionLocal()
         try:
             session = get_session(db, session_id)
-            if session is None:
+            # Enforce ownership before any fast-path return (e.g. the already
+            # EVALUATED result below), so a non-owner can never read another
+            # user's evaluation. A non-owner is treated as "not found".
+            if session is None or session.user_id != user_id:
                 raise AnswerClaimNotFound("Interview session not found")
             question = get_question_for_session(db, session_id, question_id)
             if question is None:
@@ -501,8 +505,20 @@ class InterviewService:
         )
 
     @staticmethod
+    def _normalize_answer(answer: str | None) -> str:
+        """Canonical form of a candidate answer used for storage and comparison.
+
+        Trims surrounding whitespace so the persisted answer and the duplicate
+        check agree; internal content is left untouched.
+        """
+        return (answer or "").strip()
+
+    @staticmethod
     def _answers_equal(first: str | None, second: str | None) -> bool:
-        return (first or "").strip() == (second or "").strip()
+        return (
+            InterviewService._normalize_answer(first)
+            == InterviewService._normalize_answer(second)
+        )
 
     def _claim_evaluation_retry(
         self,
@@ -537,10 +553,15 @@ class InterviewService:
                 update_session_state(
                     db, session, status=SessionStatus.IN_PROGRESS, updated_at=now
                 )
+                # Refresh the staleness lease so a concurrent worker sees this
+                # retry as in-progress and backs off. Without this, the lease
+                # kept the original (already-stale) answer_submitted_at, so a
+                # second worker would immediately re-claim the same retry.
                 update_question(
                     db,
                     question,
                     status=QuestionStatus.EVALUATING,
+                    answer_submitted_at=now,
                 )
                 create_audit_event(
                     db,
@@ -695,16 +716,36 @@ class InterviewService:
                     if existing is not None:
                         return self._next_question_result(existing)
                     raise GenerationConflict("Generation state changed before persistence")
-                existing = get_question_by_number(db, session_id, next_number)
+                # Recompute the slot from the authoritative, locked state rather
+                # than trusting the value snapshotted before the (slow) LLM call:
+                # if a stale-lease concurrent generation advanced the interview
+                # while we were calling the LLM, the pre-LLM number is stale.
+                persisted_questions = list_questions(db, session_id)
+                persist_number = max(
+                    (
+                        item.question_number
+                        for item in persisted_questions
+                        if item.question_number is not None
+                    ),
+                    default=0,
+                ) + 1
+                existing = get_question_by_number(db, session_id, persist_number)
                 if existing is not None:
                     return self._next_question_result(existing)
+                if persist_number > 5:
+                    # The interview filled up while we were generating; do not
+                    # persist an out-of-range question. A subsequent call
+                    # transitions the session to READY_TO_FINISH.
+                    raise GenerationConflict(
+                        "Interview already has the maximum number of questions"
+                    )
 
                 question = create_question(
                     db,
                     session_id=session_id,
                     question=generated_question,
                     difficulty=current_difficulty,
-                    question_number=next_number,
+                    question_number=persist_number,
                     status=QuestionStatus.ACTIVE,
                 )
                 now = datetime.utcnow()
@@ -717,7 +758,7 @@ class InterviewService:
                         if retry_started
                         else "GENERATION_SUCCEEDED"
                     ),
-                    question_number=next_number,
+                    question_number=persist_number,
                     from_status=SessionStatus.GENERATING,
                     to_status=SessionStatus.IN_PROGRESS,
                     created_at=now,
@@ -726,6 +767,21 @@ class InterviewService:
                     db, session, status=SessionStatus.IN_PROGRESS, updated_at=now
                 )
                 return self._next_question_result(question)
+        except IntegrityError:
+            # A concurrent generation won the race to persist the next
+            # question (same number, or the single-active-question index).
+            # Return that already-persisted active question instead of
+            # surfacing a 500; if none is visible, report a retryable conflict.
+            recovery_db = SessionLocal()
+            try:
+                active = get_current_question(recovery_db, session_id)
+            finally:
+                recovery_db.close()
+            if active is not None:
+                return self._next_question_result(active)
+            raise GenerationConflict(
+                "Concurrent question generation conflict"
+            )
         finally:
             db.close()
 
