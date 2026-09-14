@@ -30,6 +30,9 @@ venv/
 /backend/knowledge_base/**/faiss.index
 /backend/knowledge_base/**/metadata.json
 
+# Local context/handoff notes written for a conversation, not project docs.
+HANDOFF.md
+
 # One-off local debugging scripts and generated test inputs
 /backend/debug_cv_flow.ps1
 /backend/verify_interview_flow.py
