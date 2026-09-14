@@ -1,0 +1,40 @@
+# Keep the backend build context small and free of secrets or local state.
+.git
+.github
+.vscode
+.idea
+
+# Secrets and local environment files never belong in an image. The "**/"
+# prefix matters: a bare ".env" would only match the context root and would
+# happily copy backend/.env, which holds real credentials.
+**/.env
+**/.env.*
+!.env.example
+
+# Local runtime data: uploaded CVs, generated FAISS indexes, temp files.
+.runtime/
+backend/uploads/
+backend/temp/
+temp/
+backend/backend_index/
+backend/test_index/
+backend/knowledge_base/**/faiss.index
+backend/knowledge_base/**/metadata.json
+
+# Python build artefacts and caches.
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+
+# The frontend has its own image and build context.
+frontend/
+node_modules/
+dist/
+
+# Docs and one-off local scripts.
+HANDOFF.md
+iamges/
+legacy/
+structure.txt

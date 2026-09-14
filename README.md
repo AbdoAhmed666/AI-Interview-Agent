@@ -625,7 +625,59 @@ GET /my-sessions
 GET /session/{id}
 Reports
 POST /download-report
-⚙️ Installation
+🐳 Run with Docker (recommended)
+
+Everything — PostgreSQL, the API and the UI — comes up with one command. The
+backend image bakes the sentence-transformers embedding model in, so the
+container starts without downloading anything, and migrations are applied
+automatically before the API accepts a request.
+
+```bash
+git clone https://github.com/AbdoAhmed666/AI-Interview-Agent.git
+cd AI-Interview-Agent
+
+cp .env.docker.example .env
+# Fill in SECRET_KEY - compose refuses to start without it:
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+
+docker compose up --build
+```
+
+| Service  | URL                        |
+| -------- | -------------------------- |
+| Frontend | http://localhost:3000      |
+| API      | http://localhost:8000      |
+| API docs | http://localhost:8000/docs |
+
+`LLM_PROVIDER=mock` is the default, so the stack runs end to end with no API
+key. Set `LLM_PROVIDER=gemini` (or `groq`, or `router`) plus the matching key in
+`.env` for real model output.
+
+Useful commands:
+
+```bash
+docker compose logs -f backend     # follow the API logs
+docker compose down                # stop, keeping the database
+docker compose down --volumes      # stop and wipe the database + uploads
+docker compose build frontend      # rebuild after changing NEXT_PUBLIC_API_URL
+```
+
+Notes:
+
+- `NEXT_PUBLIC_API_URL` is inlined into the client bundle at build time, so it
+  is the address the **browser** uses (a published host port), not a name on
+  the compose network. Changing it needs a frontend rebuild.
+- Uploaded CVs and generated FAISS indexes live in the `runtime` volume; the
+  database lives in `pgdata`. Neither survives `down --volumes`.
+- The backend container applies migrations in its entrypoint. That suits a
+  single API container; if you scale to several replicas, run migrations as a
+  one-shot job instead and drop that step from the entrypoint.
+- The image installs the default `torch` build, which pulls CUDA libraries this
+  CPU-only app never uses. Installing the CPU-only wheel
+  (`--index-url https://download.pytorch.org/whl/cpu`) cuts the image size
+  substantially and is worth doing before pushing it to a registry.
+
+⚙️ Installation (without Docker)
 1. Clone the repository
 git clone https://github.com/AbdoAhmed666/AI-Interview-Agent.git
 
@@ -644,6 +696,10 @@ source .venv/bin/activate
 Install dependencies:
 
 pip install -r requirements.txt
+
+Apply the database migrations (PostgreSQL must be running and DATABASE_URL set):
+
+alembic upgrade head
 
 Run the API:
 

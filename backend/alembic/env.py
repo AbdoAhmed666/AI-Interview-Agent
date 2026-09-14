@@ -19,8 +19,9 @@ sys.path.append(os.getcwd())
 # access to the values within the .ini file in use.
 config = context.config
 
-if DATABASE_URL:
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+# alembic.ini deliberately carries no connection string; the URL always comes
+# from the environment via database.py, which refuses to import without one.
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
