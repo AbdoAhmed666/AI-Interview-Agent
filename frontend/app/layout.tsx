@@ -15,8 +15,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
+    // Browser extensions commonly inject attributes onto <html>/<body> before
+    // React hydrates (e.g. bbai-tooltip-injected), which React would otherwise
+    // report as a hydration mismatch. suppressHydrationWarning applies to the
+    // element itself only, so the rest of the tree is still checked.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <InterviewProvider>
             <Toaster
