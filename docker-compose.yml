@@ -1,0 +1,82 @@
+# Full local stack: PostgreSQL, the FastAPI backend, and the Next.js frontend.
+#
+#   cp .env.docker.example .env
+#   docker compose up --build
+#
+# The backend applies migrations on start, so the database is ready before the
+# API serves anything.
+
+name: ai-interview-agent
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_interview_agent}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The backend waits on this, so it never races an unready database.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ai_interview_agent}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    # Naming the image lets CI build it once with buildx and have compose reuse
+    # it instead of rebuilding the whole thing a second time.
+    image: ai-interview-backend:${IMAGE_TAG:-local}
+    build:
+      # Repository root: requirements.txt lives there, not in backend/.
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ai_interview_agent}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required - see .env.docker.example}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-false}
+      # Must list the origin the browser loads the frontend from.
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MODEL_NAME: ${MODEL_NAME:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+    volumes:
+      # Uploaded CVs and generated FAISS indexes. Keep this on a real volume or
+      # every container replacement loses the candidates' uploads.
+      - runtime:/app/.runtime
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  frontend:
+    image: ai-interview-frontend:${IMAGE_TAG:-local}
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time. It is the address the
+        # BROWSER uses, so it is a published host port - not http://backend.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  runtime:
