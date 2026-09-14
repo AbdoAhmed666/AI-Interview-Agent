@@ -23,6 +23,15 @@ def normalize_database_url(url: str) -> str:
 
 DATABASE_URL = normalize_database_url(settings.database_url)
 
+if not DATABASE_URL:
+    # create_engine("") raises a SQLAlchemy parse error that says nothing about
+    # what is actually wrong, and it fires at import time - before the startup
+    # config validation in main.py can report it.
+    raise RuntimeError(
+        "DATABASE_URL is not set. Set it in the environment (Docker) or in a "
+        ".env file next to the backend (see .env.example)."
+    )
+
 engine = create_engine(
     DATABASE_URL,
     echo=False,
