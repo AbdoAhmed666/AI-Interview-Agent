@@ -84,19 +84,20 @@ export default function useInterview() {
     try {
       const data = await evaluateAnswer(sessionId, questionId, answer);
 
-      setAnswer("");
-
       // Show the AI's feedback on the answer just submitted (returned for
       // every question, including the last).
       setEvaluation(data.evaluation ?? null);
 
       // The backend ends the interview by returning READY_TO_FINISH (there is
-      // no sixth question); the answered-count is a defensive fallback.
+      // no sixth question); the answered-count is a defensive fallback, and it
+      // only applies once this answer really was evaluated.
       const isFinished =
         data?.status === "READY_TO_FINISH" ||
-        questionNumber >= totalQuestions;
+        (questionNumber >= totalQuestions && Boolean(data?.evaluation));
 
       if (isFinished) {
+        setAnswer("");
+
         const result = await finishInterview(sessionId);
 
         // Backend returns overall_score / recommendation.
@@ -105,6 +106,19 @@ export default function useInterview() {
         setFinished(true);
         return;
       }
+
+      if (!data?.next_question) {
+        // The answer was accepted but no next question came back - e.g. a
+        // duplicate submit arriving while the first evaluation is still in
+        // flight. Keep the current question (and what was typed) on screen
+        // instead of blanking the card.
+        setError(
+          "Your answer is still being evaluated. Please wait a moment and submit again.",
+        );
+        return;
+      }
+
+      setAnswer("");
 
       setDifficulty(data.difficulty ?? difficulty);
       setQuestion(data.next_question);

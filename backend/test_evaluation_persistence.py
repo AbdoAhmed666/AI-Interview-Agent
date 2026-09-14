@@ -352,3 +352,72 @@ def test_evaluation_retry_failure_remains_retryable(monkeypatch):
             db.close()
     finally:
         _restore_question()
+
+
+def test_fresh_claim_is_evaluated_in_the_same_request(monkeypatch):
+    """Reproduce the /adaptive-interview sequence: claim, then evaluate.
+
+    ``claim_answer`` stamps ``answer_submitted_at`` microseconds before
+    ``evaluate_claimed_answer`` reads it back. Without the ``just_claimed``
+    flag the request mistakes its own brand-new claim for another worker's
+    in-flight evaluation, so *every* first submission fails with 409.
+    """
+    _restore_question()
+    monkeypatch.setattr(
+        interview_service_module, "evaluate_answer_with_llm", lambda **kwargs: _evaluation()
+    )
+    service = _service_without_manager()
+    try:
+        claim = service.claim_answer(
+            user_id=USER_ID,
+            session_id=SESSION_ID,
+            question_id=QUESTION_ID,
+            answer="my fresh answer",
+        )
+        assert not claim.get("already_submitted")
+        assert claim["status"] == QuestionStatus.EVALUATING.value
+
+        result = service.evaluate_claimed_answer(
+            USER_ID, SESSION_ID, QUESTION_ID, just_claimed=True
+        )
+
+        assert result["status"] == QuestionStatus.EVALUATED.value
+        assert result["evaluation"]["score"] == 8
+
+        db = SessionLocal()
+        try:
+            assert db.get(InterviewQuestion, QUESTION_ID).status == QuestionStatus.EVALUATED.value
+            # Owning the claim is not a recovery, so no retry event is written.
+            assert db.query(InterviewAuditLog).filter_by(
+                session_id=SESSION_ID,
+                question_id=QUESTION_ID,
+                event_type="EVALUATION_RETRY_STARTED",
+            ).count() == 0
+        finally:
+            db.close()
+    finally:
+        _restore_question()
+
+
+def test_foreign_in_flight_evaluation_still_conflicts(monkeypatch):
+    """``just_claimed`` must not weaken the concurrency guard for other callers."""
+    _prepare_question(QuestionStatus.EVALUATING.value, answer="in-flight answer")
+    db = SessionLocal()
+    try:
+        # A different worker claimed this question moments ago.
+        db.get(InterviewQuestion, QUESTION_ID).answer_submitted_at = datetime.utcnow()
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setattr(
+        interview_service_module,
+        "evaluate_answer_with_llm",
+        lambda **kwargs: pytest.fail("LLM must not run for an in-flight evaluation"),
+    )
+    try:
+        with pytest.raises(interview_service_module.EvaluationPersistenceConflict):
+            _service_without_manager().evaluate_claimed_answer(
+                USER_ID, SESSION_ID, QUESTION_ID
+            )
+    finally:
+        _restore_question()

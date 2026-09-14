@@ -326,8 +326,17 @@ class InterviewService:
         user_id: int,
         session_id: int,
         question_id: int,
+        just_claimed: bool = False,
     ) -> dict[str, Any]:
-        """Evaluate a persisted answer, then atomically persist its result."""
+        """Evaluate a persisted answer, then atomically persist its result.
+
+        ``just_claimed`` marks the caller as the worker whose own
+        :meth:`claim_answer` moved this question ACTIVE -> EVALUATING moments
+        ago, inside the same request. That caller already holds the evaluation
+        lease, so it must not read its own fresh claim as somebody else's
+        in-flight evaluation. Recovery callers (``/retry-evaluation``, the
+        stale-lease takeover) leave it ``False`` and keep the full guard.
+        """
         retry_started = False
         db = SessionLocal()
         try:
@@ -349,11 +358,16 @@ class InterviewService:
                     user_id, session_id, question_id
                 )
             elif question.status == QuestionStatus.EVALUATING.value:
-                if not self._is_stale(question.answer_submitted_at):
-                    raise EvaluationPersistenceConflict("Evaluation is still in progress")
-                retry_started = self._claim_evaluation_retry(
-                    user_id, session_id, question_id
-                )
+                # Only a *foreign* claim blocks here: it is either still in
+                # flight (conflict) or stale enough to take over (retry).
+                if not just_claimed:
+                    if not self._is_stale(question.answer_submitted_at):
+                        raise EvaluationPersistenceConflict(
+                            "Evaluation is still in progress"
+                        )
+                    retry_started = self._claim_evaluation_retry(
+                        user_id, session_id, question_id
+                    )
             else:
                 raise EvaluationPersistenceConflict("Question is not awaiting evaluation")
             persisted_answer = question.answer

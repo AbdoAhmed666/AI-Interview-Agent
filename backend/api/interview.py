@@ -75,10 +75,13 @@ def adaptive_interview(request: EvaluationRequest, current_user: User = Depends(
                 )
                 return _with_evaluation(next_result, claim_result.get("evaluation"))
             return claim_result
+        # The claim above transitioned the question to EVALUATING in this very
+        # request, so this call owns the lease it is about to read.
         evaluation_result = service.evaluate_claimed_answer(
             user_id=current_user.id,
             session_id=request.session_id,
             question_id=request.question_id,
+            just_claimed=True,
         )
         if evaluation_result.get("status") == "EVALUATED":
             next_result = service.generate_next_question(
