@@ -89,7 +89,8 @@ class InterviewSession(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('IN_PROGRESS', 'GENERATING', 'GENERATION_FAILED', 'READY_TO_FINISH', 'COMPLETED')",
+            "status IN ('IN_PROGRESS', 'GENERATING', 'GENERATION_FAILED', "
+            "'READY_TO_FINISH', 'COMPLETED', 'ABANDONED')",
             name="ck_interview_sessions_status",
         ),
         Index(

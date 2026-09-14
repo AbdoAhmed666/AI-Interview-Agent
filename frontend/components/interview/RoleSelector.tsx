@@ -54,7 +54,16 @@ export default function RoleSelector() {
     setRole,
     start,
     loading: interviewLoading,
+    sessionId,
+    finished,
+    resuming,
+    questionNumber,
+    totalQuestions,
   } = useInterview();
+
+  // An interview that is still open in the database was either started in this
+  // tab or restored on load. Starting another one abandons it, so say so.
+  const interviewInProgress = sessionId !== null && !finished;
 
   useEffect(() => {
     async function load() {
@@ -116,6 +125,7 @@ export default function RoleSelector() {
     Boolean(analysis) &&
     Boolean(role) &&
     !loading &&
+    !resuming &&
     !interviewLoading;
 
   return (
@@ -124,6 +134,19 @@ export default function RoleSelector() {
       <h3 className="font-semibold mb-4">
         Choose Your Role
       </h3>
+
+      {resuming && (
+        <div className="mb-3 text-sm text-[var(--muted)]">
+          Restoring your interview...
+        </div>
+      )}
+
+      {interviewInProgress && (
+        <div className="mb-3 rounded-md border border-yellow-200/40 bg-yellow-500/10 p-3 text-sm">
+          You have an interview in progress (question {questionNumber} of{" "}
+          {totalQuestions}). Starting a new one leaves it unfinished.
+        </div>
+      )}
 
       <div className="mb-3 text-sm text-[var(--muted)]">
         {cvLoading
@@ -161,7 +184,11 @@ export default function RoleSelector() {
           disabled={!canStart}
           loading={loading || interviewLoading}
         >
-          {loading || interviewLoading ? "Starting..." : "Start Interview"}
+          {loading || interviewLoading
+            ? "Starting..."
+            : interviewInProgress
+              ? "Start new interview"
+              : "Start Interview"}
         </Button>
 
       </div>

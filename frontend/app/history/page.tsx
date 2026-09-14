@@ -7,13 +7,32 @@ import AppShell from "@/components/layout/AppShell";
 import { getMySessions } from "@/services/history.service";
 import type { SessionSummary } from "@/types/interview";
 import Link from "next/link";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { sessionStatusLabel } from "@/lib/sessionStatus";
 
 export default function HistoryPage() {
 
     const [sessions, setSessions] = useState<SessionSummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        getMySessions().then(setSessions);
+        let active = true;
+
+        getMySessions()
+            .then((data) => {
+                if (active) setSessions(data);
+            })
+            .catch((err) => {
+                if (active) setError(getApiErrorMessage(err));
+            })
+            .finally(() => {
+                if (active) setLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (
@@ -23,7 +42,15 @@ export default function HistoryPage() {
 
             <div className="space-y-5">
 
-                {sessions.length === 0 && (
+                {loading && <p className="text-gray-400">Loading…</p>}
+
+                {error && (
+                    <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        {error}
+                    </p>
+                )}
+
+                {!loading && !error && sessions.length === 0 && (
                     <p className="text-gray-400">No interviews yet.</p>
                 )}
 
@@ -35,7 +62,7 @@ export default function HistoryPage() {
                         <div className="flex justify-between">
                             <div>
                                 <h3 className="font-bold">{session.role}</h3>
-                                <p className="text-gray-400">{session.status}</p>
+                                <p className="text-gray-400">{sessionStatusLabel(session.status)}</p>
                             </div>
 
                             <div className="text-right">

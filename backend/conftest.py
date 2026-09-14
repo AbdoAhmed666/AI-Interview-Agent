@@ -20,6 +20,7 @@ layer and keep running without a configured ``DATABASE_URL``.
 import sys
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -215,6 +216,65 @@ def _seed(db):
     db.flush()
     _reset_sequences(db)
     db.commit()
+
+
+DEFAULT_FAKE_QUESTION = "Why is CI/CD important for backend engineers?"
+
+
+def make_fake_interview_service(
+    first_question: str = DEFAULT_FAKE_QUESTION,
+    eligible: bool = True,
+):
+    """An InterviewService wired to stub AI/domain helpers, with no __init__.
+
+    PostgreSQL is the workflow authority, so the manager holds no session
+    state: ``start_interview`` only needs these stateless components to check
+    eligibility and generate the first question.
+    """
+    from services.interview_service import InterviewService
+
+    chunks = [
+        SimpleNamespace(chunk=SimpleNamespace(role="user", content="cv context")),
+        SimpleNamespace(
+            chunk=SimpleNamespace(role="knowledge", content="knowledge context")
+        ),
+    ]
+    service = InterviewService.__new__(InterviewService)
+    service.manager = SimpleNamespace(
+        storage=SimpleNamespace(
+            has_cv=lambda user_id: True,
+            get_active_cv=lambda user_id: Path("dummy.pdf"),
+        ),
+        parser=SimpleNamespace(
+            parse=lambda file_path, role, document_type: SimpleNamespace(
+                content="backend experience"
+            )
+        ),
+        analyzer=SimpleNamespace(
+            analyze=lambda content: SimpleNamespace(skills=["python"])
+        ),
+        eligibility=SimpleNamespace(
+            evaluate=lambda analysis, role: SimpleNamespace(
+                eligible=eligible,
+                message="eligible" if eligible else "not eligible",
+                score=100.0,
+                recommended_roles=[],
+            )
+        ),
+        query_builder=SimpleNamespace(build=lambda analysis, role, difficulty: "query"),
+        rag=SimpleNamespace(
+            ensure_cv_store=lambda user_id, cv_path: None,
+            ensure_knowledge_store=lambda role: None,
+            retrieve_hybrid_isolated=lambda query, cv_store, knowledge_store: chunks,
+        ),
+        prompt_builder=SimpleNamespace(
+            build_question_prompt=(
+                lambda role, difficulty, cv_chunks, knowledge_chunks: "prompt"
+            )
+        ),
+        provider=SimpleNamespace(generate_question=lambda prompt: first_question),
+    )
+    return service
 
 
 @pytest.fixture

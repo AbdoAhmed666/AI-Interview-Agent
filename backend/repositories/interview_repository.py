@@ -20,6 +20,15 @@ _ACTIVE_QUESTION_STATUSES = (
 )
 _UNSET = object()
 
+# A session in any of these states still owes the candidate work, so it can be
+# picked up again after the browser was closed or reloaded.
+_RESUMABLE_SESSION_STATUSES = (
+    SessionStatus.IN_PROGRESS.value,
+    SessionStatus.GENERATING.value,
+    SessionStatus.GENERATION_FAILED.value,
+    SessionStatus.READY_TO_FINISH.value,
+)
+
 
 def _value(value: str | SessionStatus | QuestionStatus) -> str:
     return value.value if isinstance(value, (SessionStatus, QuestionStatus)) else value
@@ -31,6 +40,41 @@ def get_session(db: Session, session_id: int) -> InterviewSession | None:
         .filter(InterviewSession.id == session_id)
         .first()
     )
+
+
+def _resumable_sessions_query(db: Session, user_id: int):
+    return (
+        db.query(InterviewSession)
+        .filter(
+            InterviewSession.user_id == user_id,
+            InterviewSession.status.in_(_RESUMABLE_SESSION_STATUSES),
+        )
+        .order_by(
+            InterviewSession.started_at.desc().nullslast(),
+            InterviewSession.id.desc(),
+        )
+    )
+
+
+def get_latest_resumable_session(
+    db: Session,
+    user_id: int,
+) -> InterviewSession | None:
+    """Return the newest unfinished session owned by ``user_id``, if any."""
+    return _resumable_sessions_query(db, user_id).first()
+
+
+def list_resumable_sessions(
+    db: Session,
+    user_id: int,
+    *,
+    for_update: bool = False,
+) -> list[InterviewSession]:
+    """Every unfinished session owned by ``user_id``, newest first."""
+    query = _resumable_sessions_query(db, user_id)
+    if for_update:
+        query = query.with_for_update()
+    return query.all()
 
 
 def get_session_for_update(

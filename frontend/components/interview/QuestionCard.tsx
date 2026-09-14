@@ -4,7 +4,7 @@ import { useInterview } from "@/contexts/InterviewContext";
 
 export default function QuestionCard() {
 
-  const { question } = useInterview();
+  const { question, resuming } = useInterview();
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 min-h-48">
@@ -15,7 +15,10 @@ export default function QuestionCard() {
 
       <p className="text-lg leading-8 text-gray-300">
 
-        {question || "Click Start Interview to generate your first question."}
+        {question ||
+          (resuming
+            ? "Restoring your interview..."
+            : "Click Start Interview to generate your first question.")}
 
       </p>
 

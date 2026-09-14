@@ -22,6 +22,8 @@ class SessionStatus(str, Enum):
     GENERATION_FAILED = "GENERATION_FAILED"
     READY_TO_FINISH = "READY_TO_FINISH"
     COMPLETED = "COMPLETED"
+    # Left open when the candidate deliberately started a different interview.
+    ABANDONED = "ABANDONED"
 
 
 class QuestionStatus(str, Enum):
