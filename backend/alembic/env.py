@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from database import Base
+from database import Base, DATABASE_URL
 from models import User
 from config import settings
 
@@ -19,8 +19,8 @@ sys.path.append(os.getcwd())
 # access to the values within the .ini file in use.
 config = context.config
 
-if settings.database_url:
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+if DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
