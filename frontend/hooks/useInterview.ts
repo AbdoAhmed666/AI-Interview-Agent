@@ -229,6 +229,8 @@ export default function useInterview() {
   return {
     sessionId,
 
+    questionId,
+
     role,
 
     setRole,
