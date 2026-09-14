@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import type { SessionSummary, SessionDetails } from "@/types/interview";
+import { SESSION_STATUS, normalizeSessionStatus } from "@/lib/sessionStatus";
 
 export async function getMySessions(): Promise<SessionSummary[]> {
   const { data } = await api.get("/my-sessions");
@@ -8,7 +9,7 @@ export async function getMySessions(): Promise<SessionSummary[]> {
   const sessions = (data || []).map((s: any) => ({
     id: s.id,
     role: s.role,
-    status: s.status,
+    status: normalizeSessionStatus(s.status),
     overallScore: s.overall_score ?? null,
     recommendation: s.recommendation ?? null,
   } as SessionSummary));
@@ -25,7 +26,12 @@ export async function getSession(id: number): Promise<SessionDetails> {
     id: data.id ?? data.session_id,
     userId: data.user_id ?? null,
     role: data.role,
-    status: data.status ?? (data.evaluations && data.evaluations.length ? "completed" : "in-progress"),
+    status: normalizeSessionStatus(
+      data.status ??
+        (data.evaluations && data.evaluations.length
+          ? SESSION_STATUS.COMPLETED
+          : SESSION_STATUS.IN_PROGRESS),
+    ),
     sessionId: data.session_id ?? null,
     questionId: data.question_id ?? null,
     currentDifficulty: data.current_difficulty ?? null,

@@ -8,6 +8,7 @@ import { getMySessions } from "@/services/history.service";
 import type { SessionSummary } from "@/types/interview";
 import Link from "next/link";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { sessionStatusLabel } from "@/lib/sessionStatus";
 
 export default function HistoryPage() {
 
@@ -61,7 +62,7 @@ export default function HistoryPage() {
                         <div className="flex justify-between">
                             <div>
                                 <h3 className="font-bold">{session.role}</h3>
-                                <p className="text-gray-400">{session.status}</p>
+                                <p className="text-gray-400">{sessionStatusLabel(session.status)}</p>
                             </div>
 
                             <div className="text-right">

@@ -1,3 +1,5 @@
+import type { SessionStatus } from "@/lib/sessionStatus";
+
 export interface Evaluation {
   score: number;
   level: string;
@@ -35,11 +37,13 @@ export interface InterviewState {
   recommendation?: string;
 }
 
-// Backend history/session response (mapped to camelCase in frontend)
+// Backend history/session response (mapped to camelCase in frontend).
+// `status` is normalized by `lib/sessionStatus` so the UI never compares raw
+// backend strings - that mismatch is what zeroed out the dashboard analytics.
 export interface SessionSummary {
   id: number;
   role: string;
-  status: string;
+  status: SessionStatus;
   overallScore?: number | null;
   recommendation?: string | null;
 }
@@ -48,7 +52,7 @@ export interface SessionDetails {
   id: number;
   userId?: number | null;
   role?: string;
-  status?: string;
+  status?: SessionStatus;
   sessionId?: number | null;
   questionId?: number | null;
   currentDifficulty?: number | null;
