@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   startInterview,
   evaluateAnswer,
   finishInterview,
+  getActiveInterview,
 } from "@/services/interview.service";
 import { getApiErrorMessage } from "@/lib/apiError";
 
@@ -37,6 +38,70 @@ export default function useInterview() {
   const [recommendation, setRecommendation] = useState("");
 
   const [error, setError] = useState("");
+
+  const [resuming, setResuming] = useState(false);
+
+  // Resuming is attempted once per mount; React runs effects twice in
+  // development, and a second call would race the first.
+  const resumeAttempted = useRef(false);
+
+  //--------------------------------
+
+  /**
+   * Rebuild an unfinished interview from the server.
+   *
+   * Interview progress is durable in PostgreSQL, but this hook holds it in
+   * React state, so a page reload used to lose the session entirely and strand
+   * it as "in progress" forever. Best-effort: if anything fails the candidate
+   * simply gets the normal start screen.
+   */
+  async function resume() {
+    if (resumeAttempted.current || sessionId !== null || finished) {
+      return;
+    }
+
+    resumeAttempted.current = true;
+    setResuming(true);
+
+    try {
+      const data = await getActiveInterview();
+
+      if (!data?.active) {
+        return;
+      }
+
+      setSessionId(data.session_id);
+      setRole(data.role ?? "");
+      setEvaluation(data.evaluation ?? null);
+      setDifficulty(data.difficulty ?? 3);
+      setAnswer("");
+
+      if (data.status === "READY_TO_FINISH") {
+        const result = await finishInterview(data.session_id);
+
+        setQuestionNumber(data.question_number ?? totalQuestions);
+        setOverallScore(result.overall_score);
+        setRecommendation(result.recommendation);
+        setFinished(true);
+        return;
+      }
+
+      setQuestionId(data.question_id ?? null);
+      setQuestion(data.question ?? "");
+      setQuestionNumber(data.question_number ?? 1);
+
+      if (data.status === "PENDING_EVALUATION") {
+        setError(
+          "Your last answer is still being evaluated. Please refresh in a moment to continue.",
+        );
+      }
+    } catch {
+      // Leave the start screen in place, and allow a later retry.
+      resumeAttempted.current = false;
+    } finally {
+      setResuming(false);
+    }
+  }
 
   //--------------------------------
 
@@ -157,9 +222,13 @@ export default function useInterview() {
     setRecommendation("");
 
     setError("");
+
+    resumeAttempted.current = false;
   }
 
   return {
+    sessionId,
+
     role,
 
     setRole,
@@ -188,9 +257,13 @@ export default function useInterview() {
 
     error,
 
+    resuming,
+
     start,
 
     submit,
+
+    resume,
 
     reset,
   };

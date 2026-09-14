@@ -101,6 +101,22 @@ def adaptive_interview(request: EvaluationRequest, current_user: User = Depends(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.get("/active-interview", response_model=dict)
+def active_interview(current_user: User = Depends(get_current_user)) -> dict:
+    """Return the caller's unfinished interview so a reload can continue it.
+
+    Returns ``{"active": false}`` when there is nothing to resume.
+    """
+    try:
+        return _get_interview_service().resume_interview(user_id=current_user.id)
+    except AnswerClaimNotFound as exc:
+        raise HTTPException(status_code=404, detail="Interview not found") from exc
+    except EvaluationPersistenceConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except GenerationConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/finish-interview", response_model=dict)
 def finish_interview(request: FinishInterviewRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     """Return an overall summary for a completed interview."""

@@ -8,6 +8,13 @@ export async function startInterview(role: string) {
   return data;
 }
 
+export async function getActiveInterview() {
+  // Returns { active: false } when there is nothing to resume.
+  const { data } = await api.get("/active-interview");
+
+  return data;
+}
+
 export async function evaluateAnswer(
   sessionId: number,
   questionId: number,

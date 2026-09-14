@@ -16,6 +16,7 @@ from repositories.interview_repository import (
     create_session,
     create_question,
     get_current_question,
+    get_latest_resumable_session,
     get_session,
     get_question_for_session,
     get_question_for_session_for_update,
@@ -895,6 +896,142 @@ class InterviewService:
             "difficulty": question.difficulty,
             "next_question": question.question,
             "evaluation": None,
+        }
+
+    # Reported back to the client when an evaluation is genuinely still in
+    # flight on another worker, so the candidate is asked to wait rather than
+    # shown a blank interview.
+    RESUME_PENDING_EVALUATION = "PENDING_EVALUATION"
+
+    def resume_interview(self, user_id: int) -> dict[str, Any]:
+        """Rebuild the candidate's unfinished interview from PostgreSQL.
+
+        Interview progress has always been durable in the database, but the
+        browser kept it only in React state: a page reload lost the session id
+        and left the row stranded as IN_PROGRESS forever. This reconstructs the
+        client's view from the authoritative rows and, when the session stopped
+        part-way through the workflow, drives it forward with the same durable
+        recovery paths ``/retry-evaluation`` and ``/retry-generation`` use.
+        """
+        db = SessionLocal()
+        try:
+            session = get_latest_resumable_session(db, user_id)
+            if session is None:
+                return {"active": False}
+            session_id = session.id
+            role = session.role
+            session_status = session.status
+            current = get_current_question(db, session_id)
+            current_id = current.id if current is not None else None
+            current_status = current.status if current is not None else None
+            current_text = current.question if current is not None else None
+            current_number = current.question_number if current is not None else None
+            current_difficulty = (
+                current.difficulty if current is not None else None
+            )
+            answered = [q for q in list_questions(db, session_id) if q.evaluation]
+            last_answered_id = answered[-1].id if answered else None
+            last_evaluation = answered[-1].evaluation if answered else None
+            # Once every question is answered there is no open one left to read
+            # the difficulty from, so fall back to the last answered question.
+            difficulty = current_difficulty
+            if difficulty is None and answered:
+                difficulty = answered[-1].difficulty
+        finally:
+            db.close()
+
+        # The common case: reloaded while a question was on screen.
+        if current_status == QuestionStatus.ACTIVE.value:
+            return self._resume_result(
+                session_id=session_id,
+                role=role,
+                status=QuestionStatus.ACTIVE.value,
+                question_id=current_id,
+                question=current_text,
+                question_number=current_number,
+                difficulty=difficulty,
+                evaluation=last_evaluation,
+            )
+
+        # Otherwise an evaluation never landed; finish it before moving on.
+        if current_id is not None:
+            try:
+                evaluation_result = self.evaluate_claimed_answer(
+                    user_id=user_id,
+                    session_id=session_id,
+                    question_id=current_id,
+                )
+            except EvaluationPersistenceConflict:
+                # A live worker still holds the lease - keep the question on
+                # screen and let the candidate retry in a moment.
+                return self._resume_result(
+                    session_id=session_id,
+                    role=role,
+                    status=self.RESUME_PENDING_EVALUATION,
+                    question_id=current_id,
+                    question=current_text,
+                    question_number=current_number,
+                    difficulty=difficulty,
+                    evaluation=last_evaluation,
+                )
+            last_evaluation = evaluation_result.get("evaluation") or last_evaluation
+            last_answered_id = current_id
+
+        if last_answered_id is None:
+            # An empty shell: question one never made it into the database.
+            return {"active": False}
+
+        if session_status == SessionStatus.READY_TO_FINISH.value:
+            return self._resume_result(
+                session_id=session_id,
+                role=role,
+                status=SessionStatus.READY_TO_FINISH.value,
+                question_id=last_answered_id,
+                question=None,
+                question_number=len(answered) if answered else current_number,
+                difficulty=difficulty,
+                evaluation=last_evaluation,
+            )
+
+        next_result = self.generate_next_question(
+            user_id=user_id,
+            session_id=session_id,
+            question_id=last_answered_id,
+        )
+        return self._resume_result(
+            session_id=session_id,
+            role=role,
+            status=next_result.get("status", QuestionStatus.ACTIVE.value),
+            question_id=next_result.get("question_id"),
+            question=next_result.get("next_question"),
+            question_number=next_result.get("question_number") or current_number,
+            difficulty=next_result.get("difficulty", difficulty),
+            evaluation=last_evaluation,
+        )
+
+    @staticmethod
+    def _resume_result(
+        *,
+        session_id: int,
+        role: str,
+        status: str,
+        question_id: int | None,
+        question: str | None,
+        question_number: int | None,
+        difficulty: int | None,
+        evaluation: Any,
+    ) -> dict[str, Any]:
+        return {
+            "active": True,
+            "session_id": session_id,
+            "role": role,
+            "status": status,
+            "question_id": question_id,
+            "question": question,
+            "question_number": question_number,
+            "total_questions": 5,
+            "difficulty": difficulty,
+            "evaluation": evaluation,
         }
 
     def finish_interview(self, user_id: int, session_id: int) -> dict[str, Any]:
