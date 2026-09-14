@@ -15,6 +15,8 @@ PROJECT_ROOT = BACKEND_DIR.parent
 DOCKERFILE = BACKEND_DIR / "Dockerfile"
 DOCKERIGNORE = PROJECT_ROOT / ".dockerignore"
 COMPOSE_FILE = PROJECT_ROOT / "docker-compose.yml"
+GITATTRIBUTES = PROJECT_ROOT / ".gitattributes"
+ENTRYPOINT = BACKEND_DIR / "docker-entrypoint.sh"
 
 
 def _dockerfile_arg(name: str) -> str:
@@ -66,3 +68,30 @@ def test_compose_hands_the_backend_a_psycopg_v3_url():
     compose = COMPOSE_FILE.read_text()
 
     assert "postgresql+psycopg://" in compose
+
+
+def test_shell_scripts_are_pinned_to_lf_line_endings():
+    """Git for Windows checks files out as CRLF unless told otherwise.
+
+    A CRLF shebang makes the kernel look for an interpreter named "/bin/sh\r",
+    so the container dies with "no such file or directory" naming a file that is
+    plainly there. Only .gitattributes stops that at the checkout.
+    """
+    rules = {
+        line.strip()
+        for line in GITATTRIBUTES.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    }
+
+    assert "*.sh text eol=lf" in rules
+
+
+def test_the_entrypoint_has_no_carriage_returns():
+    assert b"\r" not in ENTRYPOINT.read_bytes()
+
+
+def test_the_image_strips_carriage_returns_from_the_entrypoint():
+    """Belt and braces: a checkout predating .gitattributes still has to boot."""
+    dockerfile = DOCKERFILE.read_text()
+
+    assert "sed -i 's/\\r$//' /app/backend/docker-entrypoint.sh" in dockerfile
