@@ -16,6 +16,8 @@ export const SESSION_STATUS = {
   GENERATION_FAILED: "GENERATION_FAILED",
   READY_TO_FINISH: "READY_TO_FINISH",
   COMPLETED: "COMPLETED",
+  // Left open when the candidate deliberately started a different interview.
+  ABANDONED: "ABANDONED",
   UNKNOWN: "UNKNOWN",
 } as const;
 
@@ -28,6 +30,7 @@ const LABELS: Record<SessionStatus, string> = {
   GENERATION_FAILED: "Needs retry",
   READY_TO_FINISH: "Ready to finish",
   COMPLETED: "Completed",
+  ABANDONED: "Abandoned",
   UNKNOWN: "Unknown",
 };
 
@@ -44,6 +47,11 @@ export function normalizeSessionStatus(raw: unknown): SessionStatus {
 /** True only for an interview that reached a final, scored state. */
 export function isCompletedSession(raw: unknown): boolean {
   return normalizeSessionStatus(raw) === SESSION_STATUS.COMPLETED;
+}
+
+/** True for an interview nobody will ever finish; excluded from analytics. */
+export function isAbandonedSession(raw: unknown): boolean {
+  return normalizeSessionStatus(raw) === SESSION_STATUS.ABANDONED;
 }
 
 /** True while an interview can still be answered - i.e. it is resumable. */

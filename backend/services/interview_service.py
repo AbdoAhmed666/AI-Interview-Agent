@@ -23,6 +23,7 @@ from repositories.interview_repository import (
     get_question_by_number,
     get_session_for_update,
     list_questions,
+    list_resumable_sessions,
     update_session_state,
     update_question,
 )
@@ -96,6 +97,42 @@ class InterviewService:
         self.manager = InterviewService._shared_manager
 
     @staticmethod
+    def _abandon_open_sessions(
+        db: Session,
+        user_id: int,
+        *,
+        keep_session_id: int | None = None,
+    ) -> int:
+        """Move the candidate's still-open sessions to ABANDONED.
+
+        Participates in the caller's transaction: the rows are locked FOR
+        UPDATE, so a concurrent request cannot advance a session while it is
+        being retired. Returns how many were abandoned.
+        """
+        now = datetime.utcnow()
+        abandoned = 0
+        for session in list_resumable_sessions(db, user_id, for_update=True):
+            if session.id == keep_session_id:
+                continue
+            previous_status = session.status
+            update_session_state(
+                db,
+                session,
+                status=SessionStatus.ABANDONED,
+                updated_at=now,
+            )
+            create_audit_event(
+                db,
+                session_id=session.id,
+                event_type="SESSION_ABANDONED",
+                from_status=previous_status,
+                to_status=SessionStatus.ABANDONED,
+                created_at=now,
+            )
+            abandoned += 1
+        return abandoned
+
+    @staticmethod
     def _start_durable_session(
         db: Session,
         user_id: int,
@@ -115,6 +152,12 @@ class InterviewService:
         ``status = ACTIVE`` so it is immediately claimable by the durable
         ``claim_answer`` flow.
         """
+        # Deliberately starting a new interview retires whatever the candidate
+        # left open. Without this the old row stayed IN_PROGRESS forever: it
+        # competed with the new session for :meth:`resume_interview` and
+        # permanently dragged down the dashboard's completion rate.
+        InterviewService._abandon_open_sessions(db, user_id)
+
         db_session = create_session(
             db=db,
             user_id=user_id,

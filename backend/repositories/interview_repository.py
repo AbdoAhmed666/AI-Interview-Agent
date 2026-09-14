@@ -42,11 +42,7 @@ def get_session(db: Session, session_id: int) -> InterviewSession | None:
     )
 
 
-def get_latest_resumable_session(
-    db: Session,
-    user_id: int,
-) -> InterviewSession | None:
-    """Return the newest unfinished session owned by ``user_id``, if any."""
+def _resumable_sessions_query(db: Session, user_id: int):
     return (
         db.query(InterviewSession)
         .filter(
@@ -57,8 +53,28 @@ def get_latest_resumable_session(
             InterviewSession.started_at.desc().nullslast(),
             InterviewSession.id.desc(),
         )
-        .first()
     )
+
+
+def get_latest_resumable_session(
+    db: Session,
+    user_id: int,
+) -> InterviewSession | None:
+    """Return the newest unfinished session owned by ``user_id``, if any."""
+    return _resumable_sessions_query(db, user_id).first()
+
+
+def list_resumable_sessions(
+    db: Session,
+    user_id: int,
+    *,
+    for_update: bool = False,
+) -> list[InterviewSession]:
+    """Every unfinished session owned by ``user_id``, newest first."""
+    query = _resumable_sessions_query(db, user_id)
+    if for_update:
+        query = query.with_for_update()
+    return query.all()
 
 
 def get_session_for_update(

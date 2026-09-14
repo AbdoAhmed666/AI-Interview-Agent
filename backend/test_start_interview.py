@@ -2,12 +2,12 @@
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from conftest import make_fake_interview_service
 from database import SessionLocal
 from models import InterviewAuditLog, InterviewQuestion, InterviewSession
 from repositories.interview_repository import get_question, get_session
@@ -20,58 +20,9 @@ pytestmark = pytest.mark.usefixtures("seeded_workflow")
 QUESTION_TEXT = "Why is CI/CD important for backend engineers?"
 
 
-def _fake_manager(first_question=QUESTION_TEXT, eligible=True):
-    """A manager exposing only the stateless AI/domain helpers the service uses.
-
-    PostgreSQL is the workflow authority, so the manager has no session state.
-    ``start_interview`` now drives eligibility + first-question generation
-    directly through these helper components (and ``_generate_question_text``).
-    """
-    chunks = [
-        SimpleNamespace(chunk=SimpleNamespace(role="user", content="cv context")),
-        SimpleNamespace(
-            chunk=SimpleNamespace(role="knowledge", content="knowledge context")
-        ),
-    ]
-    return SimpleNamespace(
-        storage=SimpleNamespace(
-            has_cv=lambda user_id: True,
-            get_active_cv=lambda user_id: Path("dummy.pdf"),
-        ),
-        parser=SimpleNamespace(
-            parse=lambda file_path, role, document_type: SimpleNamespace(
-                content="backend experience"
-            )
-        ),
-        analyzer=SimpleNamespace(
-            analyze=lambda content: SimpleNamespace(skills=["python"])
-        ),
-        eligibility=SimpleNamespace(
-            evaluate=lambda analysis, role: SimpleNamespace(
-                eligible=eligible,
-                message="eligible" if eligible else "not eligible",
-                score=100.0,
-                recommended_roles=[],
-            )
-        ),
-        query_builder=SimpleNamespace(build=lambda analysis, role, difficulty: "query"),
-        rag=SimpleNamespace(
-            ensure_cv_store=lambda user_id, cv_path: None,
-            ensure_knowledge_store=lambda role: None,
-            retrieve_hybrid_isolated=lambda query, cv_store, knowledge_store: chunks,
-        ),
-        prompt_builder=SimpleNamespace(
-            build_question_prompt=lambda role, difficulty, cv_chunks, knowledge_chunks: "prompt"
-        ),
-        provider=SimpleNamespace(generate_question=lambda prompt: first_question),
-    )
-
-
 def _service_with_fake_manager(first_question=QUESTION_TEXT):
     """InterviewService without the heavy __init__, wired to a stateless manager."""
-    service = InterviewService.__new__(InterviewService)
-    service.manager = _fake_manager(first_question=first_question)
-    return service
+    return make_fake_interview_service(first_question=first_question)
 
 
 def _delete_session_tree(db, session_id):
