@@ -1,8 +1,11 @@
 # Backend image for the AI Interview Agent API.
 #
-# Build context is the REPOSITORY ROOT, not backend/, because requirements.txt
-# lives there:
-#     docker build -f backend/Dockerfile -t ai-interview-backend .
+# It lives at the repository root because that is already its build context
+# (requirements.txt is here, not in backend/), and because hosts that build
+# straight from a repo - Hugging Face Spaces among them - look for a Dockerfile
+# here. The frontend keeps its own at frontend/Dockerfile.
+#
+#     docker build -t ai-interview-backend .
 
 # --------------------------------------------------------------------------
 # Build stage: install dependencies and pre-fetch the embedding model.
@@ -73,10 +76,13 @@ RUN mkdir -p /app/.runtime \
 USER app
 WORKDIR /app/backend
 
+# Most hosts hand the port to the container rather than letting it choose, so
+# read it from the environment and default to 8000 for local use.
+ENV PORT=8000
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/health', timeout=4)"
 
 ENTRYPOINT ["/app/backend/docker-entrypoint.sh"]
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

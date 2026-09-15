@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 
-DOCKERFILE = BACKEND_DIR / "Dockerfile"
+DOCKERFILE = PROJECT_ROOT / "Dockerfile"
 DOCKERIGNORE = PROJECT_ROOT / ".dockerignore"
 COMPOSE_FILE = PROJECT_ROOT / "docker-compose.yml"
 GITATTRIBUTES = PROJECT_ROOT / ".gitattributes"

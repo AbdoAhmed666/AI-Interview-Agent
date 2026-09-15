@@ -42,6 +42,35 @@ class Settings:
         os.getenv("INTERVIEW_RECOVERY_STALE_SECONDS", "300")
     )
 
+    # Abuse / cost protection. Every interview question and answer evaluation
+    # is an LLM call, so a public deployment needs a ceiling on how fast those
+    # can be triggered. See rate_limit.py.
+    rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+    rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+
+    rate_limit_expensive_per_minute: int = int(
+        os.getenv("RATE_LIMIT_EXPENSIVE_PER_MINUTE", "10")
+    )
+
+    # Across every caller combined: the limit that actually caps the API bill.
+    rate_limit_global_expensive_per_minute: int = int(
+        os.getenv("RATE_LIMIT_GLOBAL_EXPENSIVE_PER_MINUTE", "60")
+    )
+
+    # Only set this where the app really sits behind a proxy (a hosted
+    # deployment). X-Forwarded-For is caller-supplied: trusted without a proxy
+    # it lets anyone choose their own rate-limit bucket, and ignored behind one
+    # it collapses every visitor into the proxy's single bucket.
+    trust_proxy_headers: bool = os.getenv(
+        "TRUST_PROXY_HEADERS", "false"
+    ).strip().lower() in ("1", "true", "yes", "on")
+
     # Database
     database_url: str = os.getenv("DATABASE_URL", "")
 

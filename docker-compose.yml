@@ -34,9 +34,10 @@ services:
     # it instead of rebuilding the whole thing a second time.
     image: ai-interview-backend:${IMAGE_TAG:-local}
     build:
-      # Repository root: requirements.txt lives there, not in backend/.
+      # Repository root: requirements.txt lives there, and so does the
+      # backend Dockerfile.
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -50,6 +51,11 @@ services:
       # Must list the origin the browser loads the frontend from.
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+      RATE_LIMIT_EXPENSIVE_PER_MINUTE: ${RATE_LIMIT_EXPENSIVE_PER_MINUTE:-10}
+      RATE_LIMIT_GLOBAL_EXPENSIVE_PER_MINUTE: ${RATE_LIMIT_GLOBAL_EXPENSIVE_PER_MINUTE:-60}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       MODEL_NAME: ${MODEL_NAME:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}

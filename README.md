@@ -625,6 +625,12 @@ GET /my-sessions
 GET /session/{id}
 Reports
 POST /download-report
+🚀 Live deployment
+
+See [DEPLOY.md](DEPLOY.md) for a free hosting setup: Vercel for the frontend,
+Hugging Face Spaces for the API (its free tier has the RAM the embedding model
+needs) and Neon for PostgreSQL.
+
 🐳 Run with Docker (recommended)
 
 Everything — PostgreSQL, the API and the UI — comes up with one command. The
