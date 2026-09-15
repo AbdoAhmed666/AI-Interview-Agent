@@ -166,7 +166,7 @@ Put these in order and say what each one turns into what:
   the model's text?
 - What happens when the model returns something that does not fit the schema?
   Follow it to `EVALUATION_FAILED` and back.
-- Why is there a `MockProvider`, and what would the test suite look like
+- Why is there a `MockLLMProvider`, and what would the test suite look like
   without one?
 - `adaptive_engine.py`: what decides the next question's difficulty?
 
