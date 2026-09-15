@@ -59,8 +59,15 @@ COPY backend/ /app/backend/
 # Uploaded CVs and generated FAISS indexes are written under .runtime; compose
 # mounts a volume here so they outlive the container. Everything else stays
 # read-only to the unprivileged user that runs the app.
+#
+# The sed strips CRLF from the entrypoint. .gitattributes already pins it to LF,
+# but a checkout made before that landed - or an edit in a Windows editor - puts
+# "\r" back, and the kernel then looks for an interpreter literally named
+# "/bin/sh\r" and reports "no such file or directory" about a file that exists.
+# One line here makes the image immune to however it was checked out.
 RUN mkdir -p /app/.runtime \
     && chown -R app:app /app/.runtime \
+    && sed -i 's/\r$//' /app/backend/docker-entrypoint.sh \
     && chmod +x /app/backend/docker-entrypoint.sh
 
 USER app

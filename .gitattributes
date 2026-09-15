@@ -1,0 +1,15 @@
+# Line endings.
+#
+# Git for Windows checks files out with CRLF by default (core.autocrlf=true).
+# For a shell script copied into a Linux image that is fatal but baffling: the
+# kernel reads the shebang as "/bin/sh\r", cannot find an interpreter by that
+# name, and reports "no such file or directory" - about a file that plainly
+# exists. Pin every script to LF so a Windows checkout produces the same bytes
+# the container expects.
+*.sh text eol=lf
+
+# Same reasoning: these are read by Linux tooling, never by Windows.
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+.dockerignore text eol=lf
+docker-compose.yml text eol=lf
