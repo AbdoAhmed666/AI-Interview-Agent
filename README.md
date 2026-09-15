@@ -625,6 +625,19 @@ GET /my-sessions
 GET /session/{id}
 Reports
 POST /download-report
+📚 Studying this codebase
+
+[docs/LEARNING.md](docs/LEARNING.md) is a track-by-track map of the system —
+the request path, the durable state machine, the RAG pipeline, the test suite
+and the container setup — with the questions worth being able to answer about
+each, and the decisions recorded as ADRs.
+
+🚀 Live deployment
+
+See [DEPLOY.md](DEPLOY.md) for a free hosting setup: Vercel for the frontend,
+Hugging Face Spaces for the API (its free tier has the RAM the embedding model
+needs) and Neon for PostgreSQL.
+
 🐳 Run with Docker (recommended)
 
 Everything — PostgreSQL, the API and the UI — comes up with one command. The

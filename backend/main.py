@@ -26,6 +26,7 @@ from auth import router as auth_router
 from config import settings
 from evaluator import build_report_pdf, evaluate_answer, summarize_session
 from llm_provider import GeminiProvider, get_provider
+from rate_limit import rate_limit_middleware
 from schemas import EvaluationRequest, EvaluationResponse, InterviewRequest, InterviewResponse, ReportRequest, SessionSummaryRequest, SessionSummaryResponse
 from services.interview_service import InterviewService
 
@@ -38,6 +39,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Interview Agent API", lifespan=lifespan)
+
+# Throttle before anything else runs: a public deployment pays for every
+# question generated and every answer evaluated, so the ceiling has to apply
+# even to requests that would be rejected later for other reasons.
+app.middleware("http")(rate_limit_middleware)
 
 # Configure CORS for the frontend origin(s). Origins are environment-driven
 # (CORS_ALLOW_ORIGINS) so a deployed frontend can be allowed without code edits.
