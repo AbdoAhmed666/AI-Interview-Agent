@@ -6,6 +6,18 @@ is built from that CV plus a role knowledge base, each answer is scored by an
 LLM, and the next question's difficulty follows the score.
 
 [![CI](https://github.com/AbdoAhmed666/AI-Interview-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/AbdoAhmed666/AI-Interview-Agent/actions/workflows/ci.yml)
+[![Watch the demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20the%20demo-LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio)
+
+---
+
+## Demo
+
+### ▶ [Watch the walkthrough on LinkedIn](https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio)
+
+The video runs the whole thing end to end — CV upload, role eligibility, the
+adaptive interview, per-answer evaluation, and the generated report. It is the
+accurate reference for how the app looks and behaves: the images under
+`iamges/` predate the current UI and are kept only for history.
 
 ---
 
@@ -26,8 +38,6 @@ CV upload → role eligibility → RAG retrieval → adaptive interview (×5)
 Roles supported today: **Backend Engineer**, **Frontend Engineer**,
 **ML Engineer**, **Data Scientist** — each with its own knowledge base under
 [`backend/knowledge_base/`](backend/knowledge_base).
-
-**Demo video:** [walkthrough on LinkedIn](https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio)
 
 ---
 
@@ -369,8 +379,6 @@ Stated plainly, because they decide where this can and cannot be run:
 - **No structured observability** — no metrics, no tracing, no error tracking.
 - **Rate limiting is in-process**, so each replica would enforce its own share.
 - **Voice and video interviews are not implemented.** They are ideas, not code.
-- **The screenshots in `iamges/` are from an older UI** and no longer match the
-  application; they are kept only for history.
 
 ---
 
