@@ -1,658 +1,59 @@
 # AI Interview Agent
 
+An adaptive technical-interview platform: it reads a candidate's CV, checks it
+against the chosen role, and runs a five-question interview where each question
+is built from that CV plus a role knowledge base, each answer is scored by an
+LLM, and the next question's difficulty follows the score.
 
-> **An AI-powered technical interview platform that conducts adaptive, personalized interviews using candidate CV analysis, role matching, Retrieval-Augmented Generation (RAG), multi-provider LLM routing, and recruiter-style evaluation.**
-
-
-AI Interview Agent is a full-stack AI assessment platform designed to simulate a real technical interview rather than a static question-and-answer chatbot.
-
-
-The platform analyzes a candidate's CV, determines role suitability, retrieves relevant technical knowledge, generates role-specific interview questions, evaluates answers using LLMs, adapts interview difficulty based on performance, and stores the complete interview history.
-
-
-The system is built with **FastAPI, Next.js, PostgreSQL, Gemini, Groq, FAISS, Sentence Transformers, and JWT authentication**.
-
+[![CI](https://github.com/AbdoAhmed666/AI-Interview-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/AbdoAhmed666/AI-Interview-Agent/actions/workflows/ci.yml)
 
 ---
 
-# Demo Video In LinkedIn
+## What it does
 
-https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio
+A candidate signs up, uploads a CV, and picks one of four roles. The CV is
+parsed and analysed, and the role is accepted only if the profile actually
+supports it — otherwise the candidate is told why, with better-matching roles
+suggested. From there the interview runs five questions, adapting as it goes,
+and ends with an overall score, a hiring recommendation, and a downloadable PDF
+report.
 
+```
+CV upload → role eligibility → RAG retrieval → adaptive interview (×5)
+          → LLM evaluation → overall score + recommendation → PDF report
+```
 
-## 🚀 Why AI Interview Agent?
+Roles supported today: **Backend Engineer**, **Frontend Engineer**,
+**ML Engineer**, **Data Scientist** — each with its own knowledge base under
+[`backend/knowledge_base/`](backend/knowledge_base).
 
-
-Traditional interview bots often follow a fixed sequence of predefined questions.
-
-
-This project takes a different approach.
-
-
-The interviewer dynamically uses:
-
-
-- Candidate CV information
-- Selected technical role
-- Role requirements
-- Technical knowledge base
-- Previous answers
-- Previous evaluation results
-- Candidate strengths and weaknesses
-- Current interview difficulty
-
-
-to create a more realistic and personalized technical assessment.
-
-
-### The result
-
-
-Instead of:
-
-
-> Question → Answer → Next Question
-
-
-the platform follows:
-
-
-> **CV → Role Analysis → Knowledge Retrieval → Personalized Question → Answer Evaluation → Difficulty Adaptation → Next Question → Final Assessment**
-
+**Demo video:** [walkthrough on LinkedIn](https://www.linkedin.com/posts/abdelrhman-ahmed-92a432260_aiengineer-llm-generativeai-activity-7495509567758372864-Bfjz?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAitbIBM-s1FybPxKNLLcR68QSOyuy-Tio)
 
 ---
 
-
-# ✨ Key Capabilities
-
-
-## 🤖 AI-Powered Technical Interviews
-
-
-The platform can conduct technical interviews for roles such as:
-
-
-- Machine Learning Engineer
-- Data Scientist
-- Backend Developer
-- Frontend Developer
-- Software Engineer
-
-
-The interview engine generates technical questions dynamically instead of relying exclusively on a predefined question list.
-
-
----
-
-
-## 📄 CV Upload & Analysis
-
-
-Candidates can upload their CV directly from their profile.
-
-
-The system:
-
-
-1. Accepts the candidate CV
-2. Extracts the document content
-3. Analyzes candidate information
-4. Identifies technical skills and experience
-5. Matches the candidate against supported roles
-6. Determines role eligibility
-7. Uses the CV as personalized interview context
-
-
-The CV is also integrated into the RAG pipeline so interview questions can be grounded in the candidate's actual background.
-
-
-### Example
-
-
-A candidate with experience in:
-
-
-```text
-Python
-TensorFlow
-PyTorch
-Machine Learning
-FastAPI
-Docker
-
-can receive questions that are relevant to their actual technical background rather than completely generic questions.
-
-🧠 Personalized Hybrid RAG
-
-One of the core AI engineering components of the platform is the Personalized Hybrid RAG pipeline.
-
-The system combines:
-
-Candidate Context
-CV content
-Candidate skills
-Candidate experience
-Role matching results
-Technical Knowledge
-Curated technical documentation
-Role-specific knowledge
-Backend concepts
-Machine Learning concepts
-Technical interview material
-
-The pipeline is:
-
-                  Candidate CV
-                       │
-                       ▼
-                 PDF Extraction
-                       │
-                       ▼
-                    Chunking
-                       │
-                       ▼
-                  Embeddings
-                       │
-                       ▼
-                 FAISS Vector DB
-                       │
-                       │
-Technical Knowledge ──┘
-                       │
-                       ▼
-                    Retriever
-                       │
-                       ▼
-                 Context Builder
-                       │
-                       ▼
-                Query / Prompt Builder
-                       │
-                       ▼
-                     LLM
-                       │
-             ┌─────────┴─────────┐
-             ▼                   ▼
-       Interview Question   Answer Evaluation
-
-This allows the system to ground AI-generated content in retrieved information rather than relying only on the model's general knowledge.
-
-🎯 Role Matching & Eligibility
-
-Before starting an interview, the system analyzes whether the candidate's CV is suitable for the selected role.
-
-The platform supports role-aware matching and eligibility decisions.
-
-For example:
-
-Candidate CV
-     │
-     ▼
-Skill Extraction
-     │
-     ▼
-Role Matching
-     │
-     ▼
-Eligibility Check
-     │
-     ├── Eligible → Start Interview
-     │
-     └── Not Eligible → Reject Role
-
-This prevents the interview from blindly starting when the candidate's profile does not sufficiently match the selected role.
-
-🎤 Adaptive Interview Engine
-
-The interview is not static.
-
-After every answer, the AI evaluates the candidate and uses the result to determine the next difficulty level.
-
-Difficulty Logic
-             Candidate Answer
-                    │
-                    ▼
-              AI Evaluation
-                    │
-        ┌───────────┼───────────┐
-        ▼           ▼           ▼
-      Strong      Medium       Weak
-        │           │           │
-        ▼           ▼           ▼
-    Increase      Maintain    Decrease
-    Difficulty    Difficulty  Difficulty
-
-Difficulty is controlled across levels:
-
-1 → 2 → 3 → 4 → 5
-
-This creates a more realistic interview experience where the interview adjusts to the candidate's demonstrated knowledge.
-
-📊 AI Answer Evaluation
-
-Each candidate answer is evaluated by the AI.
-
-The evaluation can include:
-
-Score
-Performance level
-Strengths
-Weaknesses
-Feedback
-Knowledge gaps
-Follow-up questions
-
-Example evaluation:
-
-{
-  "score": 8,
-  "level": "Strong",
-  "strengths": [
-    "Good understanding of evaluation metrics"
-  ],
-  "weaknesses": [
-    "Limited discussion of class imbalance"
-  ],
-  "feedback": "Solid answer with room for deeper analysis.",
-  "concept_gaps": [
-    "Precision-Recall Curve"
-  ],
-  "follow_up_question": "Explain ROC-AUC."
-}
-
-This transforms raw answers into structured candidate insights.
-
-🔄 Multi-Provider LLM Architecture
-
-The system was designed with an LLM provider abstraction instead of tightly coupling the application to one model provider.
-
-Supported providers include:
-
-Google Gemini
-Groq
-Mock Provider
-
-The routing architecture follows:
-
-                LLM Router
-                    │
-          ┌─────────┴─────────┐
-          ▼                   ▼
-       Gemini                Groq
-          │                   │
-          └─────────┬─────────┘
-                    │
-                    ▼
-              Mock Fallback
-
-This makes the application more resilient to provider availability and quota limitations.
-
-🔐 Authentication & Security
-
-The application includes authentication and protected application flows.
-
-Implemented capabilities include:
-
-User registration
-User login
-JWT authentication
-Protected endpoints
-Authenticated user context
-User-specific interview history
-User-specific CV storage
-Centralized frontend token handling
-Automatic handling of unauthorized sessions
-
-Sensitive runtime data and credentials are excluded from version control.
-
-👤 User Profile
-
-Each authenticated candidate has a dedicated profile area.
-
-The profile supports:
-
-Candidate information
-CV upload
-CV processing
-CV analysis
-Role matching
-Personalized interview preparation
-
-The system also prevents a failed CV processing attempt from immediately replacing a previously valid active CV.
-
-📚 Technical Knowledge Base
-
-The platform includes a structured technical knowledge base.
-
-Current knowledge content includes technical documentation such as:
-
-backend/
-├── docker.md
-├── fastapi.md
-└── jwt.md
-
-The knowledge base is indexed and consumed by the RAG pipeline to provide technical context during interview generation and evaluation.
-
-🗂️ Interview History
-
-Every completed interview is associated with the authenticated candidate.
-
-The platform stores and displays:
-
-Interview role
-Interview status
-Overall score
-Recommendation
-Interview questions
-Candidate answers
-Individual question scores
-Feedback
-Difficulty progression
-Session information
-
-Candidates can review previous interviews through the history interface.
-
-📄 Recruiter-Style Reports
-
-The platform can generate professional interview reports containing structured assessment information.
-
-Reports are designed around recruiter-friendly insights such as:
-
-Overall candidate performance
-Technical evaluation
-Strengths
-Weaknesses
-Knowledge gaps
-Recommendation
-Interview summary
-
-The goal is to convert a conversational interview into structured assessment data.
-
-📈 Dashboard & Analytics
-
-The dashboard provides an overview of candidate interview performance.
-
-It includes metrics such as:
-
-Total interviews
-Average score
-Best score
-Completed interviews
-Interview history
-
-This gives candidates a centralized view of their interview performance over time.
-
-🏗️ System Architecture
-                              ┌─────────────────────┐
-                              │       Candidate     │
-                              └──────────┬──────────┘
-                                         │
-                                         ▼
-                              ┌─────────────────────┐
-                              │   Next.js Frontend  │
-                              │ React + TypeScript  │
-                              └──────────┬──────────┘
-                                         │
-                                         ▼
-                              ┌─────────────────────┐
-                              │     FastAPI API     │
-                              └──────────┬──────────┘
-                                         │
-                    ┌────────────────────┼────────────────────┐
-                    │                    │                    │
-                    ▼                    ▼                    ▼
-             Authentication         CV System          Interview Engine
-                 JWT                    │                    │
-                                      ▼                    ▼
-                                CV Analysis           Adaptive Engine
-                                      │                    │
-                                      ▼                    ▼
-                                Role Matching         LLM Router
-                                      │                    │
-                                      └──────────┬─────────┘
-                                                 │
-                                                 ▼
-                                      ┌─────────────────────┐
-                                      │    RAG Pipeline     │
-                                      │                     │
-                                      │ CV + Knowledge Base │
-                                      │       ↓             │
-                                      │    Chunking         │
-                                      │       ↓             │
-                                      │   Embeddings        │
-                                      │       ↓             │
-                                      │     FAISS           │
-                                      │       ↓             │
-                                      │    Retrieval        │
-                                      └──────────┬──────────┘
-                                                 │
-                                                 ▼
-                                      ┌─────────────────────┐
-                                      │      LLM Layer      │
-                                      │                     │
-                                      │ Gemini / Groq       │
-                                      └──────────┬──────────┘
-                                                 │
-                                                 ▼
-                                      ┌─────────────────────┐
-                                      │ AI Evaluation Engine │
-                                      └──────────┬──────────┘
-                                                 │
-                                                 ▼
-                                      ┌─────────────────────┐
-                                      │ PostgreSQL Database  │
-                                      └──────────┬──────────┘
-                                                 │
-                              ┌──────────────────┴──────────────┐
-                              ▼                                 ▼
-                       Interview History                 PDF Reports
-🧩 Core Application Flow
-
-The complete candidate journey is:
-
-Register
-   ↓
-Login
-   ↓
-Profile
-   ↓
-Upload CV
-   ↓
-Analyze CV
-   ↓
-Select Technical Role
-   ↓
-Role Eligibility Check
-   ↓
-Start Interview
-   ↓
-Generate Question
-   ↓
-Candidate Answers
-   ↓
-AI Evaluation
-   ↓
-Adaptive Difficulty
-   ↓
-Next Question
-   ↓
-Interview Completion
-   ↓
-Session Summary
-   ↓
-Score + Recommendation
-   ↓
-Interview History
-   ↓
-Detailed Report
-🛠️ Technology Stack
-Frontend
-Next.js 16
-React
-TypeScript
-Tailwind CSS
-Axios
-Context API
-Backend
-Python
-FastAPI
-SQLAlchemy
-Pydantic
-Alembic
-PostgreSQL
-AI / LLM
-Google Gemini
-Groq
-LLM Provider Abstraction
-Prompt Engineering
-Adaptive Interview Logic
-Structured AI Evaluation
-RAG
-FAISS
-Sentence Transformers
-LangChain Text Splitters
-Custom Retrieval Pipeline
-CV-based Retrieval
-Knowledge Base Retrieval
-Document Processing
-PDF parsing
-CV text extraction
-Document chunking
-Embedding generation
-Authentication
-JWT
-OAuth2
-Password hashing
-Protected API routes
-Reporting
-ReportLab
-PDF report generation
-Development
-Git
-GitHub
-REST APIs
-Environment-based configuration
-📁 Project Structure
-AI-Interview-Agent/
-│
-├── backend/
-│   │
-│   ├── api/
-│   │   ├── cv.py
-│   │   ├── history.py
-│   │   └── interview.py
-│   │
-│   ├── cv/
-│   │   ├── analyzer.py
-│   │   ├── eligibility.py
-│   │   ├── matcher.py
-│   │   ├── role_matcher.py
-│   │   ├── role_profiles.py
-│   │   ├── role_recommender.py
-│   │   └── storage.py
-│   │
-│   ├── interview/
-│   │   ├── interview_manager.py
-│   │   └── models.py
-│   │
-│   ├── rag/
-│   │   ├── chunker.py
-│   │   ├── config.py
-│   │   ├── embeddings.py
-│   │   ├── loader.py
-│   │   ├── models.py
-│   │   ├── parser.py
-│   │   ├── prompt_builder.py
-│   │   ├── query_builder.py
-│   │   ├── retriever.py
-│   │   ├── role_matcher.py
-│   │   ├── rag_service.py
-│   │   └── vector_store.py
-│   │
-│   ├── services/
-│   │   ├── cv_service.py
-│   │   ├── interview_service.py
-│   │   └── main.py
-│   │
-│   ├── knowledge_base/
-│   │   └── backend/
-│   │       ├── docker.md
-│   │       ├── fastapi.md
-│   │       └── jwt.md
-│   │
-│   ├── evaluator.py
-│   ├── main.py
-│   ├── schemas.py
-│   ├── config.py
-│   └── ...
-│
-├── frontend/
-│   │
-│   ├── app/
-│   │   ├── dashboard/
-│   │   ├── history/
-│   │   ├── interview/
-│   │   ├── profile/
-│   │   └── ...
-│   │
-│   ├── components/
-│   ├── contexts/
-│   ├── hooks/
-│   ├── services/
-│   └── lib/
-│
-├── .env.example
-├── .gitignore
-├── requirements.txt
-├── package.json
-├── README.md
-└── LICENSE
-🔌 REST API
-Authentication
-POST /register
-POST /login
-GET  /me
-CV
-POST /cv/upload
-GET  /cv
-Interview
-POST /start-interview
-POST /adaptive-interview
-POST /finish-interview
-POST /summarize-session
-History
-GET /my-sessions
-GET /session/{id}
-Reports
-POST /download-report
-📚 Studying this codebase
-
-[docs/LEARNING.md](docs/LEARNING.md) is a track-by-track map of the system —
-the request path, the durable state machine, the RAG pipeline, the test suite
-and the container setup — with the questions worth being able to answer about
-each, and the decisions recorded as ADRs.
-
-🚀 Live deployment
-
-See [DEPLOY.md](DEPLOY.md) for a free hosting setup: Vercel for the frontend,
-Hugging Face Spaces for the API (its free tier has the RAM the embedding model
-needs) and Neon for PostgreSQL.
-
-🐳 Run with Docker (recommended)
-
-Everything — PostgreSQL, the API and the UI — comes up with one command. The
-backend image bakes the sentence-transformers embedding model in, so the
-container starts without downloading anything, and migrations are applied
-automatically before the API accepts a request.
+## Quick start
+
+The whole stack — PostgreSQL, the API and the UI — comes up with one command.
+The embedding model is baked into the backend image, so the container starts
+without downloading anything, and migrations are applied before the API serves
+a request.
 
 ```bash
 git clone https://github.com/AbdoAhmed666/AI-Interview-Agent.git
 cd AI-Interview-Agent
 
 cp .env.docker.example .env
-# Fill in SECRET_KEY - compose refuses to start without it:
-python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
+`SECRET_KEY` has no default and compose refuses to start without one:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Put that value in `.env`, then:
+
+```bash
 docker compose up --build
 ```
 
@@ -664,374 +65,337 @@ docker compose up --build
 
 `LLM_PROVIDER=mock` is the default, so the stack runs end to end with no API
 key. Set `LLM_PROVIDER=gemini` (or `groq`, or `router`) plus the matching key in
-`.env` for real model output.
+`.env` for real model output — an environment change only, no rebuild.
 
-Useful commands:
+The first build is slow: it installs PyTorch and pre-fetches the embedding
+model.
 
-```bash
-docker compose logs -f backend     # follow the API logs
-docker compose down                # stop, keeping the database
-docker compose down --volumes      # stop and wipe the database + uploads
-docker compose build frontend      # rebuild after changing NEXT_PUBLIC_API_URL
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    B[Browser - Next.js 16] -->|JWT| API[FastAPI]
+    API --> RL[Rate limiting]
+    RL --> R[Routes: api/]
+    R --> S[Services: interview_service.py]
+    S --> Repo[Repositories]
+    S --> RAG[RAG pipeline]
+    S --> LLM[LLM provider]
+    Repo --> PG[(PostgreSQL<br/>authoritative state)]
+    RAG --> F[(FAISS indexes)]
+    LLM --> G[Gemini / Groq / Mock]
 ```
 
-Notes:
+The layering is deliberate and enforced by convention:
 
-- `NEXT_PUBLIC_API_URL` is inlined into the client bundle at build time, so it
-  is the address the **browser** uses (a published host port), not a name on
-  the compose network. Changing it needs a frontend rebuild.
-- Uploaded CVs and generated FAISS indexes live in the `runtime` volume; the
-  database lives in `pgdata`. Neither survives `down --volumes`.
-- The backend container applies migrations in its entrypoint. That suits a
-  single API container; if you scale to several replicas, run migrations as a
-  one-shot job instead and drop that step from the entrypoint.
-- The image installs the default `torch` build, which pulls CUDA libraries this
-  CPU-only app never uses. Installing the CPU-only wheel
-  (`--index-url https://download.pytorch.org/whl/cpu`) cuts the image size
-  substantially and is worth doing before pushing it to a registry.
+| Layer            | Responsibility                                              |
+| ---------------- | ----------------------------------------------------------- |
+| `backend/api/`   | HTTP: request shape, auth dependency, status codes           |
+| `backend/services/` | The workflow. Owns transactions, calls the AI components  |
+| `backend/repositories/` | Database primitives. Flush, never commit — the caller owns the transaction |
 
-⚙️ Installation (without Docker)
-1. Clone the repository
-git clone https://github.com/AbdoAhmed666/AI-Interview-Agent.git
+---
 
+## Interview state machine
 
-cd AI-Interview-Agent
-2. Backend Setup
-cd backend
+Interview progress is held in PostgreSQL, not in server memory. A restart, a
+second API worker, or a browser reload does not erase an interview in progress.
 
+Session states — [`backend/schemas.py`](backend/schemas.py):
 
+```
+IN_PROGRESS → GENERATING → READY_TO_FINISH → COMPLETED
+     │             │
+     │             └→ GENERATION_FAILED
+     └→ ABANDONED   (the candidate deliberately started a different interview)
+```
+
+Question states:
+
+```
+ACTIVE → EVALUATING → EVALUATED
+              └→ EVALUATION_FAILED
+```
+
+What the implementation in
+[`backend/services/interview_service.py`](backend/services/interview_service.py)
+and
+[`backend/repositories/interview_repository.py`](backend/repositories/interview_repository.py)
+actually does:
+
+- **Row locks.** Every transition takes `SELECT ... FOR UPDATE` on the session
+  and question rows, so two concurrent requests cannot both advance the same
+  interview.
+- **Idempotent submission.** Submitting the same answer twice returns the first
+  result rather than re-evaluating; a *different* answer for an
+  already-answered question is rejected.
+- **An audit row per transition.** `interview_audit_log` records the event, the
+  statuses moved between, and when — so the history of an interview is
+  reconstructable after the fact.
+- **Recovery from interrupted work.** An evaluation whose worker died is picked
+  up again once its lease goes stale; a fresh lease is treated as another worker
+  still holding it, and left alone.
+- **Guarded question generation.** The question number is recomputed inside the
+  final locked transaction, and a concurrent insert is caught and resolved to
+  the question the other worker created rather than failing.
+- **Resume after reload.** `GET /active-interview` rebuilds the client's view
+  from the database — the open question, its number, the difficulty, and the
+  previous answer's evaluation — and carries forward a session that stopped
+  part-way through.
+
+Schema changes go through Alembic; there are six migrations in
+[`backend/alembic/versions/`](backend/alembic/versions).
+
+---
+
+## The AI pipeline
+
+```mermaid
+flowchart LR
+    CV[CV PDF] --> P[parser] --> C[chunker] --> E[embeddings]
+    E --> CVS[(CV index)]
+    KB[Role knowledge base] --> E2[embeddings] --> KS[(Knowledge index)]
+    CVS --> RT[retriever]
+    KS --> RT
+    RT --> PB[prompt_builder] --> M[LLM] --> V[Pydantic validation] --> OUT[Question / Evaluation]
+```
+
+Implementation in [`backend/rag/`](backend/rag) and
+[`backend/cv/`](backend/cv).
+
+**Retrieval draws on two sources.** The query is embedded once, then run
+against the candidate's own CV index *and* the role's knowledge index; the
+results are merged and sorted by similarity, so a generated question is grounded
+in both the candidate's experience and the role's material. This is two-source
+dense retrieval — not a dense/sparse hybrid in the BM25 sense.
+
+**Vector stores are isolated per request.**
+[`rag_service.py`](backend/rag/rag_service.py) hands each request its own CV and
+knowledge stores rather than keeping one on the service object, and serialises
+index build-and-load per directory with a lock. The shared-store version had a
+real failure mode: two candidates interviewing at once could have one CV
+overwrite the other's retrieval context.
+
+**Model output is validated, not trusted.** The LLM's evaluation is parsed into
+`EvaluationResponse` — a bounded score, a level, strengths, weaknesses,
+feedback, concept gaps, a follow-up question, and `extra: forbid`. Output that
+does not fit moves the question to `EVALUATION_FAILED`, which is retryable,
+rather than being stored half-formed.
+
+**Difficulty adapts** in [`adaptive_engine.py`](backend/adaptive_engine.py): a
+`strong` answer raises it by one (capped at 5), a `weak` one lowers it (floored
+at 1), anything else holds.
+
+**Providers** are behind one interface in
+[`llm_provider.py`](backend/llm_provider.py): `GeminiProvider`, `GroqProvider`,
+a `RouterProvider`, and `MockLLMProvider` — the last is for development and
+tests, and is what lets the whole suite run with no API key and no network.
+
+---
+
+## Rate limiting
+
+[`backend/rate_limit.py`](backend/rate_limit.py) puts two independent limits in
+front of the endpoints that cost money, because they do different jobs:
+
+- **Per caller** — stops one visitor crowding everyone else out.
+- **Globally, across all callers** — this is the limit that bounds LLM spend. A
+  per-caller limit alone is defeated by anyone who can vary the address they
+  appear to come from; a global count never asks who is calling.
+
+The credential endpoints are rate-limited too, where repeated attempts are the
+attack rather than the cost. `/health` never is — a throttled probe reads as an
+outage. Limits and whether `X-Forwarded-For` is trusted are environment
+settings; see [`.env.docker.example`](.env.docker.example).
+
+State is in process memory, which fits a single API container. It is a cost
+guard, not a security control.
+
+---
+
+## Features
+
+- **CV upload and analysis** — PDF extraction, skill analysis, per-user storage.
+  A new CV is stored inactive and only becomes the active one after indexing and
+  analysis succeed, so a failed upload leaves the previous CV in place.
+- **Role eligibility** — the interview will not start on a role the CV does not
+  support; the candidate gets a score, a reason, and recommended roles instead.
+- **Adaptive interview** — five questions, difficulty following performance.
+- **Structured evaluation** — score, level, strengths, weaknesses, feedback,
+  concept gaps and a follow-up question for every answer.
+- **Interview history** — per-candidate, with the full question and answer trail.
+- **Dashboard** — completion rate, average and best score, score trend, and
+  average by role.
+- **PDF report** — a recruiter-style summary, generated with ReportLab.
+- **Authentication** — JWT with bcrypt-hashed passwords; history and CVs are
+  scoped to the authenticated user.
+
+---
+
+## Testing and CI
+
+```bash
+cd backend && python -m pytest -q     # needs PostgreSQL and DATABASE_URL
+cd frontend && npm test
+```
+
+Last run on a database migrated from scratch:
+
+```
+backend    112 passed, 9 skipped
+frontend    26 passed
+```
+
+The nine skips are legacy manual scripts that need either local CV fixtures or
+a network download of the embedding model; they skip deliberately rather than
+fail.
+
+The suite is hermetic. [`backend/conftest.py`](backend/conftest.py) seeds
+exactly the state the durable-workflow tests expect and tears it down again, so
+the suite passes on any clean database rather than on one developer's machine.
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs three jobs on every
+push, and the third is the one worth knowing about:
+
+| Job | What it does |
+| --- | --- |
+| Backend tests | PostgreSQL service container, migrations, `pytest` |
+| Frontend tests and build | `vitest`, then `next build` |
+| Docker images | Builds **both** images, runs `docker compose up --wait`, and checks that the API and the UI actually respond |
+
+That last job is why the badge means something: it proves the containers build
+*and* start *and* serve, not merely that the Dockerfiles parse. It is gated to
+pull requests and `main`, since a cold backend build takes around fifteen
+minutes.
+
+---
+
+## Running without Docker
+
+Requires Python 3.11 and a running PostgreSQL 16.
+
+```bash
 python -m venv .venv
-Windows
-.venv\Scripts\activate
-Linux / macOS
-source .venv/bin/activate
-
-Install dependencies:
-
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-Apply the database migrations (PostgreSQL must be running and DATABASE_URL set):
+cp .env.example .env             # set DATABASE_URL and SECRET_KEY
 
+cd backend
 alembic upgrade head
-
-Run the API:
-
 uvicorn main:app --reload
+```
 
-The backend will be available at:
+In a second terminal:
 
-http://localhost:8000
-
-FastAPI documentation:
-
-http://localhost:8000/docs
-3. Frontend Setup
-
-Open another terminal:
-
+```bash
 cd frontend
-
-
 npm install
-
-
 npm run dev
+```
 
-The frontend will be available at:
+A note on the database driver: this project ships `psycopg` v3, not `psycopg2`.
+SQLAlchemy resolves a driver-less `postgresql://` URL to psycopg2 and fails with
+`ModuleNotFoundError: No module named 'psycopg2'`, so
+[`backend/database.py`](backend/database.py) rewrites `postgres://` and
+`postgresql://` to `postgresql+psycopg://`. Hosting providers hand out both
+forms, so either works as `DATABASE_URL`.
 
-http://localhost:3000
-🔐 Environment Configuration
+---
 
-Create a .env file based on .env.example.
+## Deployment
 
-DATABASE_URL=postgresql+psycopg://postgres:your_password@localhost:5432/ai_interview_agent
+[`DEPLOY.md`](DEPLOY.md) documents a path with no hosting cost: Vercel for the
+frontend, Hugging Face Spaces for the API (its free tier has the memory the
+embedding model needs), and Neon for PostgreSQL. It is written with the
+limitations of that setup stated rather than glossed over.
 
+There is no public instance running at the moment.
 
-SECRET_KEY=replace_with_a_long_random_secret
+---
 
+## Project structure
 
-ALGORITHM=HS256
+```
+.
+├── Dockerfile                  backend image (build context is the repo root)
+├── docker-compose.yml
+├── DEPLOY.md
+├── requirements.txt
+├── backend/
+│   ├── main.py                 app, middleware, CORS, /health
+│   ├── config.py               settings; refuses to boot on unsafe config
+│   ├── database.py             engine, session factory, URL normalisation
+│   ├── models.py  schemas.py   ORM models; Pydantic contracts and enums
+│   ├── security.py  auth.py    JWT, bcrypt, the current-user dependency
+│   ├── rate_limit.py
+│   ├── api/                    cv.py · history.py · interview.py
+│   ├── services/               interview_service.py · cv_service.py
+│   ├── repositories/           interview_repository.py
+│   ├── rag/                    parser · chunker · embeddings · vector_store
+│   │                           retriever · prompt_builder · query_builder
+│   ├── cv/                     analyzer · eligibility · role matching · storage
+│   ├── evaluator.py            LLM evaluation, summary, PDF report
+│   ├── llm_provider.py         Gemini · Groq · Router · Mock
+│   ├── adaptive_engine.py
+│   ├── knowledge_base/         per-role technical material
+│   ├── alembic/versions/       six migrations
+│   └── test_*.py               the backend suite
+├── frontend/
+│   ├── app/                    login · register · dashboard · interview
+│   │                           history · profile
+│   ├── components/interview/
+│   ├── hooks/useInterview.ts   interview state and the submit/resume flow
+│   ├── lib/                    axios · sessionStatus · analytics
+│   └── services/               API clients
+└── docs/LEARNING.md
+```
 
+---
 
-ACCESS_TOKEN_EXPIRE_MINUTES=60
+## Known limitations
 
+Stated plainly, because they decide where this can and cannot be run:
 
-GEMINI_API_KEY=your_gemini_api_key
+- **Uploaded CVs and FAISS indexes are on local disk.** The runtime storage
+  design therefore assumes a single API instance. Running several replicas needs
+  those moved to object storage first.
+- **Migrations run from the container entrypoint.** Fine for one container;
+  several replicas racing to migrate on deploy want a separate one-shot job.
+- **The JWT is kept in `localStorage`**, not an httpOnly cookie, which leaves it
+  reachable from JavaScript.
+- **No structured observability** — no metrics, no tracing, no error tracking.
+- **Rate limiting is in-process**, so each replica would enforce its own share.
+- **Voice and video interviews are not implemented.** They are ideas, not code.
+- **The screenshots in `iamges/` are from an older UI** and no longer match the
+  application; they are kept only for history.
 
+---
 
-MODEL_NAME=gemini-2.0-flash
+## Studying this codebase
 
+[`docs/LEARNING.md`](docs/LEARNING.md) maps the project for anyone who wants to
+understand it rather than just run it: the path a single request takes, the
+durable state machine and its locks, the RAG pipeline, the test suite, the
+container setup, and the decisions behind each — with the questions worth being
+able to answer about every one.
 
-GROQ_API_KEY=your_groq_api_key
+---
 
+## Author
 
-GROQ_MODEL=llama-3.3-70b-versatile
-
-
-LLM_PROVIDER=router
-
-Never commit real API keys, database passwords, JWT secrets, CVs, generated indexes, or runtime user data to GitHub.
-
-🧪 Testing
-
-The repository includes backend tests covering important application components, including:
-
-CV analysis
-CV storage
-CV indexing
-Role eligibility
-Role matching
-Role recommendation
-Interview flow
-RAG service
-Vector store
-Retrieval pipeline
-
-Example:
-
-pytest
-🔒 Runtime Data & Privacy
-
-User-generated and machine-generated runtime artifacts are intentionally excluded from version control.
-
-The repository ignores:
-
-.env
-.runtime/
-uploads/
-temporary files
-generated FAISS indexes
-generated metadata
-local history data
-test artifacts
-debug scripts
-temporary JSON files
-
-This keeps the GitHub repository clean and prevents accidental exposure of candidate data or secrets.
-
-📊 Engineering Highlights
-
-This project demonstrates practical experience across multiple areas of modern AI engineering.
-
-AI Engineering
-LLM-powered question generation
-Structured LLM evaluation
-Multi-provider LLM routing
-Adaptive reasoning workflow
-Prompt engineering
-Context-aware generation
-RAG Engineering
-Document parsing
-Intelligent chunking
-Embedding generation
-FAISS vector indexing
-Semantic retrieval
-Context construction
-Candidate-specific retrieval
-Backend Engineering
-FastAPI REST architecture
-Service-layer separation
-Pydantic schemas
-SQLAlchemy ORM
-PostgreSQL
-Alembic migrations
-JWT authentication
-Protected endpoints
-Frontend Engineering
-Next.js App Router
-TypeScript
-Component-based architecture
-Authentication context
-API service layer
-Axios interceptors
-Protected application shell
-Interview state management
-Software Engineering
-Environment-based configuration
-Runtime data isolation
-Git/GitHub workflow
-Modular architecture
-Testable services
-Separation of concerns
-Error handling
-Provider abstraction
-💡 Key Engineering Decisions
-Provider Abstraction
-
-Instead of embedding a specific LLM provider throughout the application, the project uses an abstraction layer that allows providers to be switched or routed.
-
-This makes the AI layer easier to maintain and extend.
-
-Personalized Context
-
-Interview questions are not generated independently from the candidate.
-
-The platform combines:
-
-Candidate
-   +
-CV
-   +
-Selected Role
-   +
-Technical Knowledge
-   +
-Previous Performance
-
-to generate a more personalized assessment.
-
-Adaptive Difficulty
-
-The interview engine uses evaluation results to dynamically control question difficulty.
-
-This avoids a one-size-fits-all interview experience.
-
-User-Specific Data Isolation
-
-CVs and generated retrieval artifacts are organized around the authenticated user instead of being treated as globally shared runtime files.
-
-This is important for a multi-user interview platform.
-
-📸 Application Screenshots
-
-The application includes interfaces for:
-
-Landing Page
-Authentication
-Dashboard
-Profile
-CV Upload
-CV Analysis
-Role Selection
-Technical Interview
-AI Evaluation
-Interview History
-Interview Details
-PDF Report
-
-Screenshots can be added here:
-
-docs/
-└── screenshots/
-    ├── home.png
-    ├── login.png
-    ├── dashboard.png
-    ├── profile.png
-    ├── cv-analysis.png
-    ├── interview.png
-    ├── evaluation.png
-    ├── history.png
-    └── report.png
-🗺️ Roadmap
-✅ Implemented
- User Registration
- User Login
- JWT Authentication
- Protected API Endpoints
- User Profile
- CV Upload
- CV Text Extraction
- CV Analysis
- Role Matching
- Role Eligibility
- Role Recommendation
- Personalized Interview Flow
- AI Question Generation
- Technical Answer Evaluation
- Adaptive Difficulty
- Strength Detection
- Weakness Detection
- Knowledge Gap Detection
- Follow-up Question Generation
- Gemini Integration
- Groq Integration
- LLM Provider Routing
- Mock LLM Fallback
- PostgreSQL Persistence
- SQLAlchemy ORM
- Alembic
- Interview History
- Detailed Interview View
- Dashboard Analytics
- PDF Reports
- Knowledge Base
- FAISS Vector Store
- Sentence Transformer Embeddings
- RAG Retrieval
- Context-Aware Prompt Construction
- User-specific CV/index runtime storage
- Runtime data protection through .gitignore
- Centralized frontend authentication handling
-🚧 Next Improvements
- UI/UX refinement
- Expanded technical knowledge base
- More role profiles
- Improved evaluation consistency
- Automated end-to-end testing
- Production deployment
- Observability and logging
- Evaluation benchmarks for RAG quality
- LLM cost/latency monitoring
-🔮 Future Vision
-
-The long-term goal is to evolve AI Interview Agent into a complete AI technical assessment platform.
-
-Potential future capabilities include:
-
-🎙️ Real-time voice interviews
-🗣️ Speech-to-text
-🔊 Text-to-speech
-📹 Video interview support
-👨‍💼 Recruiter dashboard
-🌍 Multi-language interviews
-☁️ Cloud deployment
-📊 Advanced candidate analytics
-🧪 Automated interview benchmarking
-🔍 Explainable candidate evaluation
-🎯 What This Project Demonstrates
-
-AI Interview Agent is more than a chatbot.
-
-It demonstrates the ability to design and implement a complete AI product across the full stack:
-
-Frontend
-   ↓
-REST API
-   ↓
-Authentication
-   ↓
-Business Logic
-   ↓
-CV Intelligence
-   ↓
-RAG Pipeline
-   ↓
-LLM Infrastructure
-   ↓
-AI Evaluation
-   ↓
-Adaptive Decision Making
-   ↓
-Database
-   ↓
-Reports & Analytics
-
-The project combines AI engineering, backend engineering, RAG, LLM integration, authentication, database design, frontend development, and software architecture into one end-to-end application.
-
-👨‍💻 Author
-
-Abdelrhman Ahmed
-
+**Abdelrhman Ahmed**
 AI Engineer | Machine Learning | LLMs | RAG | FastAPI | Python
+[github.com/AbdoAhmed666](https://github.com/AbdoAhmed666)
 
-GitHub:
+## License
 
-https://github.com/AbdoAhmed666
+MIT.
 
-📄 License
+## Built with
 
-This project is licensed under the MIT License.
-
-Built With
-
-Python · FastAPI · Next.js · React · TypeScript · PostgreSQL · SQLAlchemy · Gemini · Groq · FAISS · Sentence Transformers · LangChain · ReportLab · JWT
+Python · FastAPI · SQLAlchemy · Alembic · PostgreSQL · Next.js · React ·
+TypeScript · Tailwind · FAISS · sentence-transformers · LangChain · Gemini ·
+Groq · ReportLab · JWT · Docker · pytest · vitest
