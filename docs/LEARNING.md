@@ -49,8 +49,10 @@ Follow a single click on **Submit Answer** all the way down and back:
 
 ```
 frontend/components/interview/AnswerEditor.tsx
+  → frontend/contexts/InterviewContext.tsx  one hook instance, shared
   → frontend/hooks/useInterview.ts          submit()
-  → frontend/lib/axios.ts                   the request leaves the browser
+  → frontend/services/interview.service.ts  camelCase → snake_case, picks the path
+  → frontend/lib/axios.ts                   baseURL + auth header; the request leaves
   → backend/main.py                         app setup, CORS middleware
   → backend/api/interview.py                /adaptive-interview
   → backend/services/interview_service.py
@@ -66,8 +68,8 @@ frontend/components/interview/AnswerEditor.tsx
 - Which of those three touches the LLM, and which only touch the database?
 - Where does the response turn back into what the question card shows?
 
-**Exercise:** add a `print` (or a log line) at each of the seven layers, submit
-one answer, and read the order they fire in. Remove them afterwards.
+**Exercise:** add a `print` (or a log line) at each layer of the chain above,
+submit one answer, and read the order they fire in. Remove them afterwards.
 
 ---
 
@@ -324,7 +326,7 @@ is what separates someone who writes code from someone who ships it.
 
 | Track | Status | Notes |
 | --- | --- | --- |
-| 0 — One request end to end | not started | |
+| 0 — One request end to end | in progress | Browser side done; see `TRACK-0-NOTES.md`. Next: the route body's three service calls, and the trip back up. |
 | 1 — Backend and data | not started | |
 | 2 — The AI pipeline | not started | |
 | 3 — Testing | not started | |
